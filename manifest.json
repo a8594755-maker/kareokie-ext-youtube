@@ -1,0 +1,64 @@
+{
+  "manifestVersion": 1,
+  "id": "youtube",
+  "name": "YouTube",
+  "version": "1.0.0",
+  "author": "KAREOKIE",
+  "description": "Search YouTube and import videos you have the rights to use (audio, music video and the uploader's subtitles), with yt-dlp.",
+  "homepage": "https://github.com/a8594755-maker/kareokie-ext-youtube",
+  "license": "MIT",
+  "minAppVersion": "0.1.0",
+  "entry": "main.py",
+  "capabilities": ["search", "resolve", "metadata", "video"],
+  "urlPatterns": [
+    "^(?:https?://)?(?:www\\.|m\\.|music\\.)?youtube\\.com/watch\\?(?:[^#]*&)?v=(?P<id>[A-Za-z0-9_-]{11})",
+    "^(?:https?://)?(?:www\\.|m\\.)?youtube\\.com/(?:shorts|embed|live)/(?P<id>[A-Za-z0-9_-]{11})",
+    "^(?:https?://)?youtu\\.be/(?P<id>[A-Za-z0-9_-]{11})"
+  ],
+  "requirements": ["yt-dlp>=2024.0.0"],
+  "permissions": ["network", "files:song-folder"],
+  "notes": "Downloads from youtube.com with yt-dlp. Always free, distributed separately from KAREOKIE.",
+  "terms": {
+    "version": "1",
+    "text": "For accessing content you have the rights to use. You must follow YouTube's Terms of Service.",
+    "i18n": {
+      "zh-TW": "僅用於存取您有權使用的內容。您必須遵守 YouTube 服務條款。",
+      "ja": "利用する権利のあるコンテンツへのアクセス専用です。YouTube の利用規約を守ってください。"
+    }
+  },
+  "i18n": {
+    "zh-TW": {
+      "name": "YouTube",
+      "description": "搜尋 YouTube，並匯入您有權使用的影片（音訊、MV 與上傳者提供的字幕），使用 yt-dlp。"
+    },
+    "ja": {
+      "name": "YouTube",
+      "description": "YouTube を検索し、利用する権利のある動画（音声・MV・投稿者の字幕）を yt-dlp で取り込みます。"
+    }
+  },
+  "settings": [
+    {
+      "key": "downloadVideo",
+      "type": "boolean",
+      "default": true,
+      "label": "Download the music video",
+      "description": "Off: only the audio is downloaded and the stage shows the thumbnail.",
+      "i18n": {
+        "zh-TW": {"label": "下載 MV 影片", "description": "關閉時只下載音訊，舞台顯示縮圖。"},
+        "ja": {"label": "MV 動画をダウンロード", "description": "オフにすると音声のみをダウンロードし、ステージにはサムネイルを表示します。"}
+      }
+    },
+    {
+      "key": "subtitles",
+      "type": "boolean",
+      "default": true,
+      "label": "Use the uploader's subtitles as lyrics candidates",
+      "i18n": {
+        "zh-TW": {"label": "使用上傳者的字幕作為歌詞候選"},
+        "ja": {"label": "投稿者の字幕を歌詞の候補に使う"}
+      }
+    }
+  ],
+  "updateIndex": "https://raw.githubusercontent.com/a8594755-maker/kareokie-ext-youtube/main/index.json",
+  "timeouts": {"search": 40, "resolve": 1800, "metadata": 40, "video": 1800}
+}
