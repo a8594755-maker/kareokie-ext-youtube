@@ -138,7 +138,12 @@ def resolve(item_or_url: Any, dest_dir: str, progress: Callable[..., None], canc
     #    decodes it once to 44.1 kHz float32) + subtitles
     out_tmpl = os.path.join(dest_dir, "raw_audio.%(ext)s")
     ydl_audio_opts = {
-        "format": "bestaudio/best",
+        # A plain HTTPS stream first: segmented (HLS) audio can lose segments on a bad connection.
+        "format": "bestaudio[protocol^=http]/bestaudio/best",
+        # A failed piece fails the download instead of leaving a file with missing or no audio.
+        "retries": 10,
+        "fragment_retries": 10,
+        "skip_unavailable_fragments": False,
         "outtmpl": out_tmpl,
         "noplaylist": True,
         "quiet": True,

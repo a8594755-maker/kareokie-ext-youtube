@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.1 — 2026-10-26
+
+- Released as a community extension: unsigned (KAREOKIE shows its usual "do you trust this extension" warning
+  before installing), author "kareokie-ext-youtube contributors". yt-dlp stays unpinned so new yt-dlp releases
+  are picked up when the extension is installed or updated.
+- More reliable audio downloads: a plain HTTPS audio stream is preferred over segmented (HLS) audio, failed
+  pieces are retried, and a download that still loses a piece fails instead of leaving a file with missing or
+  no audio (reported as "Couldn't decode the audio … received no packets").
+
 ## 1.0.0 — 2026-10-24
 
 - First release as a separate extension (the YouTube code previously built into KAREOKIE).

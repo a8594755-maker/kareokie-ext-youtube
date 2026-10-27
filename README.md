@@ -1,6 +1,6 @@
-# KAREOKIE YouTube extension
+# kareokie-ext-youtube: a YouTube source for KAREOKIE
 
-A free, first-party **music source extension** for [KAREOKIE](https://github.com/a8594755-maker/KAREOKIE):
+A free, community-made **music source extension** for [KAREOKIE](https://github.com/a8594755-maker/KAREOKIE):
 search YouTube and import videos you have the rights to use. KAREOKIE itself only imports local
 files; online sources like this one are separate extensions you choose to install.
 
@@ -38,8 +38,8 @@ python build.py --key keys/kareokie-2026.private.pem --key-id kareokie-2026 --in
   --base-url https://github.com/a8594755-maker/kareokie-ext-youtube/releases/download/v1.0.0/
 ```
 
-`build.py` uses `tools/kext.py` (copied from the KAREOKIE repository's `extensions/tools/`). Official
-releases are signed with the KAREOKIE release key; the private key is never committed.
+`build.py` uses `tools/kext.py` (copied from the KAREOKIE repository's `extensions/tools/`). This is a
+community project: KAREOKIE doesn't build, sign or ship it, and no private key is ever committed.
 
 ## Develop
 
