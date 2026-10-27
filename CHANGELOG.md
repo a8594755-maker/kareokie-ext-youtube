@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.2 — 2026-10-27
+
+- yt-dlp keeps itself up to date: imports check PyPI at most every 12 hours (and again after an error a newer
+  yt-dlp may fix, at most every 30 minutes) and install a newer yt-dlp into the extension's data folder. After a
+  "confirm you're not a bot" or a broken-format error, the import is retried once with the new yt-dlp. Before,
+  yt-dlp stayed at the version installed with the extension, and old versions get blocked by YouTube.
+- Readable errors in English, Traditional Chinese and Japanese (Windows' display language) instead of raw yt-dlp
+  output: blocked by YouTube's bot check (what to try: no VPN / proxy, another network, wait, browser sign-in),
+  cookies that can't be read, and YouTube changes yt-dlp can't handle yet.
+- New settings: "Use my YouTube sign-in from a browser" (Firefox, Chrome, Edge, Brave; off by default) and a
+  cookies.txt file, for networks YouTube keeps blocking. Firefox is the one that works on Windows: Chrome, Edge
+  and Brave encrypt their cookies.
+- YouTube's player challenges are solved with a JavaScript runtime when one is installed (deno, Node.js or Bun)
+  together with the new `yt-dlp-ejs` dependency, which gives yt-dlp the full list of formats.
+- The video's language (the uploader's setting) goes to KAREOKIE with the title and artist. KAREOKIE 0.2.0 uses it
+  to tell the original lyrics from the subtitles' translations when it can't recognize the sung language itself.
+
 ## 1.0.1 — 2026-10-26
 
 - Released as a community extension: unsigned (KAREOKIE shows its usual "do you trust this extension" warning

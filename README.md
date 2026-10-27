@@ -17,8 +17,22 @@ files; online sources like this one are separate extensions you choose to instal
 | `metadata` | title / artist / duration of a URL without downloading |
 | URLs | `youtube.com/watch?v=…`, `youtu.be/…`, `/shorts/`, `/embed/`, `/live/`, `music.youtube.com` |
 
-Dependency: [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense), installed by KAREOKIE into this
-extension's own folder (`pip install --target`), never into the app.
+Dependencies: [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense) and `yt-dlp-ejs`, installed by KAREOKIE
+into this extension's own folder (`pip install --target`), never into the app. YouTube changes often, so the
+extension keeps yt-dlp up to date by itself: imports check PyPI at most every 12 hours and install a newer
+yt-dlp into the extension's data folder (`<dataDir>/yt-dlp/<version>/`); the newer of the two copies is used.
+An error a newer yt-dlp may fix ("confirm you're not a bot", missing formats, HTTP 403) checks again sooner and
+retries the import once. With a JavaScript runtime installed (deno, Node.js or Bun), yt-dlp solves YouTube's
+player challenges with it and finds every format.
+
+## Settings
+
+| Setting | |
+|---|---|
+| Download the music video | off: audio only, the stage shows the thumbnail |
+| Use the uploader's subtitles as lyrics candidates | |
+| Use my YouTube sign-in from a browser | off by default. For networks YouTube keeps blocking with "confirm you're not a bot": yt-dlp reads that browser's YouTube cookies and downloads as you. On Windows only Firefox works reliably (Chrome, Edge and Brave encrypt their cookies). YouTube may restrict accounts that download a lot. |
+| Or a cookies.txt file | a Netscape-format cookies.txt exported from a signed-in browser |
 
 ## Install
 
