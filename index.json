@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "name": "KAREOKIE YouTube extension",
+  "name": "kareokie-ext-youtube",
   "extensions": [
     {
       "id": "youtube",
       "name": "YouTube",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Search YouTube and import videos you have the rights to use (audio, music video and the uploader's subtitles), with yt-dlp.",
-      "author": "KAREOKIE",
+      "author": "kareokie-ext-youtube contributors",
       "homepage": "https://github.com/a8594755-maker/kareokie-ext-youtube",
       "license": "MIT",
       "minAppVersion": "0.1.0",
@@ -27,10 +27,10 @@
           "description": "YouTube を検索し、利用する権利のある動画（音声・MV・投稿者の字幕）を yt-dlp で取り込みます。"
         }
       },
-      "official": true,
-      "downloadUrl": "https://github.com/a8594755-maker/kareokie-ext-youtube/releases/download/v1.0.0/kareokie-ext-youtube-1.0.0.kext",
-      "sha256": "ac2471f11b52ae8b867af93ea114872bf4b4b5673183a38b86a672ce1ca6e3e9",
-      "size": 8833
+      "official": false,
+      "downloadUrl": "https://github.com/a8594755-maker/kareokie-ext-youtube/releases/download/v1.0.1/kareokie-ext-youtube-1.0.1.zip",
+      "sha256": "47fbb380d59f1626cfed6c7775a2b03eccf8fa97d9ef7f77ac883e924c669ccb",
+      "size": 8820
     }
   ]
 }
