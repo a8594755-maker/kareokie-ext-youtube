@@ -19,13 +19,16 @@ from __future__ import annotations
 import glob
 import importlib
 import json
+import hashlib
 import os
+import platform
 import re
 import shutil
 import subprocess
 import sys
 import time
 import urllib.request
+import zipfile
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 SUBTITLE_LANGS = ["zh-TW", "zh-Hant", "zh-HK", "zh-CN", "zh", "yue", "yue-HK", "nan", "nan-TW", "ja", "ko", "en"]
@@ -225,6 +228,165 @@ def update_yt_dlp(progress: Optional[Callable[..., None]] = None, after_error: b
 
 
 # ---------------------------------------------------------------------------
+# JavaScript runtime
+#
+# yt-dlp solves YouTube's player challenges with deno, Node.js or Bun (and yt-dlp-ejs); without one it gets fewer
+# formats. On Windows yt-dlp finds them on PATH. An app started from the Finder on macOS has only
+# /usr/bin:/bin:/usr/sbin:/sbin on its PATH, so a runtime from Homebrew, the deno / Bun installers or nvm isn't found
+# there: the extension looks in those places itself and gives yt-dlp the paths. When none of them is new enough,
+# imports download the extension's own deno, pinned with its SHA-256, into <dataDir>/deno/<version>/.
+# ---------------------------------------------------------------------------
+
+DENO_VERSION = "2.9.8"
+DENO_DOWNLOADS = {  # (sys.platform, platform.machine()) -> (url, sha256 of the zip)
+    ("darwin", "arm64"): (
+        f"https://github.com/denoland/deno/releases/download/v{DENO_VERSION}/deno-aarch64-apple-darwin.zip",
+        "9f0bf660393da2eaff044cdc7444cb08c73f235849b61d224d825a194ce7c98e",
+    ),
+}
+DENO_TIMEOUT_SEC = 900
+# the oldest versions yt-dlp accepts (yt_dlp/utils/_jsruntime.py)
+JS_MIN_VERSIONS = {"deno": (2, 3, 0), "node": (22, 0, 0), "bun": (1, 2, 11)}
+MAC_BIN_DIRS = ("/opt/homebrew/bin", "/usr/local/bin", "/opt/local/bin", "~/.deno/bin", "~/.bun/bin",
+                "~/.volta/bin", "~/.local/bin")
+
+
+def _own_deno() -> Optional[str]:
+    data = _context.get("dataDir")
+    exe = os.path.join(data, "deno", DENO_VERSION, "deno") if data else ""
+    return exe if exe and os.path.isfile(exe) and os.access(exe, os.X_OK) else None
+
+
+def _exe_version(path: str) -> Tuple[int, ...]:
+    """`<runtime> --version` as a tuple: deno 2.9.8 …, v24.11.1, 1.2.11 (() when it doesn't run)."""
+    try:
+        out = subprocess.run([path, "--version"], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, text=True, errors="replace", timeout=15).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ()
+    m = re.search(r"\d+(?:\.\d+)+", out or "")
+    return _vtuple(m.group(0)) if m else ()
+
+
+def _mac_runtimes() -> Dict[str, str]:
+    """deno / node / bun the user installed, wherever macOS installers put them: name -> path of the first one that
+    runs and is new enough for yt-dlp (a Homebrew node whose libraries were upgraded away doesn't start)."""
+    dirs = [d for d in os.environ.get("PATH", "").split(os.pathsep) if d]
+    dirs += [os.path.expanduser(d) for d in MAC_BIN_DIRS]
+    nvm = glob.glob(os.path.expanduser("~/.nvm/versions/node/*/bin"))
+    dirs += sorted(nvm, key=lambda d: _vtuple(os.path.basename(os.path.dirname(d))), reverse=True)
+    found: Dict[str, str] = {}
+    for name in JS_MIN_VERSIONS:
+        for d in dirs:
+            exe = os.path.join(d, name)
+            if os.path.isfile(exe) and os.access(exe, os.X_OK) and _exe_version(exe) >= JS_MIN_VERSIONS[name]:
+                found[name] = exe
+                break
+    return found
+
+
+def _js_runtimes() -> Dict[str, Dict[str, str]]:
+    """yt-dlp's `js_runtimes`: on macOS with the paths found, elsewhere looked up on PATH by yt-dlp."""
+    if sys.platform != "darwin":
+        return {"deno": {}, "node": {}, "bun": {}}
+    own = _own_deno()
+    found = _mac_runtimes()
+    if own:
+        found["deno"] = own
+    return {name: {"path": path} for name, path in found.items()} or {"deno": {}}
+
+
+def _no_quarantine(path: str) -> None:
+    """Gatekeeper blocks quarantined executables; files written by this process shouldn't have it, but make sure."""
+    subprocess.run(["/usr/bin/xattr", "-r", "-d", "com.apple.quarantine", path], stdin=subprocess.DEVNULL,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+
+
+def ensure_js_runtime(progress: Optional[Callable[..., None]] = None,
+                      cancel: Optional[Callable[[], None]] = None) -> Optional[str]:
+    """macOS: the path of a JavaScript runtime yt-dlp accepts, downloading the pinned deno when there's none.
+    Never fails an import (None: yt-dlp goes on without one). Elsewhere: nothing to do."""
+    spec = DENO_DOWNLOADS.get((sys.platform, platform.machine()))
+    data = _context.get("dataDir")
+    if sys.platform != "darwin" or not _bundled_version():
+        return None  # Windows finds runtimes on PATH; a development / test setup (no yt-dlp of our own) is left alone
+    own = _own_deno() or next(iter(_mac_runtimes().values()), None)
+    if own:
+        return own
+    if not spec or not data:
+        return None
+    root = os.path.join(data, "deno")
+    os.makedirs(root, exist_ok=True)
+    failed = os.path.join(root, ".failed")
+    try:
+        if time.time() - os.path.getmtime(failed) < RECHECK_AFTER_ERROR_SEC:
+            return None  # the last download failed a moment ago (offline?): don't fetch 40 MB on every import
+    except OSError:
+        pass
+    lock = _take_lock(root)
+    if lock is None:
+        return None  # another call is downloading it right now
+    url, sha256 = spec
+    tmp = os.path.join(root, DENO_VERSION + ".tmp")
+    try:
+        if progress is not None:
+            progress(None, f"Downloading the JavaScript runtime for YouTube (deno {DENO_VERSION}, about 40 MB)…")
+        shutil.rmtree(tmp, ignore_errors=True)
+        os.makedirs(tmp)
+        archive = os.path.join(tmp, "deno.zip")
+        digest = hashlib.sha256()
+        started = time.time()
+        req = urllib.request.Request(url, headers={"User-Agent": "kareokie-ext-youtube"})
+        with urllib.request.urlopen(req, timeout=30) as r, open(archive, "wb") as f:
+            while True:
+                if cancel is not None:
+                    cancel()
+                if time.time() - started > DENO_TIMEOUT_SEC:
+                    raise TimeoutError(f"took longer than {DENO_TIMEOUT_SEC} s")
+                chunk = r.read(1 << 20)
+                if not chunk:
+                    break
+                digest.update(chunk)
+                f.write(chunk)
+        if digest.hexdigest() != sha256:
+            raise ValueError(f"{url}: SHA-256 {digest.hexdigest()} is not the pinned {sha256}")
+        exe = os.path.join(tmp, "deno")
+        with zipfile.ZipFile(archive) as z, z.open("deno") as src, open(exe, "wb") as dst:
+            shutil.copyfileobj(src, dst)
+        os.remove(archive)
+        os.chmod(exe, 0o755)
+        _no_quarantine(tmp)
+        if _exe_version(exe) < JS_MIN_VERSIONS["deno"]:
+            raise RuntimeError("the downloaded deno doesn't run")
+        target = os.path.join(root, DENO_VERSION)
+        shutil.rmtree(target, ignore_errors=True)
+        os.replace(tmp, target)
+        for name in os.listdir(root):  # older pinned versions
+            path = os.path.join(root, name)
+            if os.path.isdir(path) and name != DENO_VERSION:
+                shutil.rmtree(path, ignore_errors=True)
+        try:
+            os.remove(failed)
+        except OSError:
+            pass
+        print(f"[deno] installed {DENO_VERSION}")
+        return os.path.join(target, "deno")
+    except Exception as exc:  # noqa: BLE001 - offline, GitHub down…: yt-dlp goes on without a runtime
+        if "cancel" in type(exc).__name__.lower():
+            raise  # the user cancelled the import (the runner's cancel())
+        print(f"[deno] download skipped: {exc}")
+        with open(failed, "w", encoding="utf-8"):
+            pass
+        return None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+        try:
+            os.remove(lock)
+        except OSError:
+            pass
+
+
+# ---------------------------------------------------------------------------
 # Readable errors
 #
 # The app shows "YouTube couldn't finish: <exception class>: <message>", so the class carries a short
@@ -259,6 +421,20 @@ MESSAGES: Dict[str, Dict[str, Tuple[str, str]]] = {
         "ja": ("{browser} の YouTube ログインを読み取れませんでした",
                "{browser} がインストールされ YouTube にログインしていることを確認し、ブラウザを閉じてから再試行してください。"
                "Windows の Chrome・Edge・Brave は Cookie を暗号化しているため通常は読み取れません。Firefox が最も確実です。"
+               "または拡張機能の設定の「ブラウザの YouTube ログインを使う」を「使わない」に戻してください。"),
+    },
+    "cookies-mac": {
+        "en": ("Couldn’t read your YouTube sign-in from {browser}",
+               "Make sure {browser} is installed and signed in to YouTube, close it and retry. For Chrome, Edge and "
+               "Brave, macOS asks to let “security” use the browser’s “Safe Storage” item in your keychain: enter "
+               "your Mac password and choose Allow. Or set this extension’s “Use my YouTube sign-in from a browser” back to “Don’t use”."),
+        "zh-TW": ("讀不到 {browser} 的 YouTube 登入狀態",
+                  "請確認已安裝 {browser} 並登入 YouTube，關閉瀏覽器後再重試。Chrome、Edge、Brave 的話，macOS 會詢問是否允許"
+                  "「security」使用鑰匙圈裡該瀏覽器的「Safe Storage」項目，請輸入 Mac 密碼並選擇「允許」。也可以把擴充功能設定的「使用瀏覽器的 YouTube 登入狀態」改回「不使用」。"),
+        "ja": ("{browser} の YouTube ログインを読み取れませんでした",
+               "{browser} がインストールされ YouTube にログインしていることを確認し、ブラウザを閉じてから再試行してください。"
+               "Chrome・Edge・Brave では、キーチェーンにあるブラウザの「Safe Storage」項目を「security」が使うことを macOS が確認するので、"
+               "Mac のパスワードを入力して「許可」を選んでください。"
                "または拡張機能の設定の「ブラウザの YouTube ログインを使う」を「使わない」に戻してください。"),
     },
     "cookiefile": {
@@ -297,7 +473,7 @@ class YouTubeError(Exception):
 
 
 def _lang() -> str:
-    """The user's language (the app doesn't pass its own; Windows' display language is the best guess)."""
+    """The user's language (the app doesn't pass its own; the system's display language is the best guess)."""
     tag = ""
     if sys.platform == "win32":
         try:
@@ -307,6 +483,15 @@ def _lang() -> str:
             lcid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
             tag = locale.windows_locale.get(lcid, "")
         except Exception:  # noqa: BLE001
+            tag = ""
+    elif sys.platform == "darwin":
+        # an app started from the Finder has no LANG: the first of the user's preferred languages, e.g. "zh-Hant-TW"
+        try:
+            out = subprocess.run(["/usr/bin/defaults", "read", "-g", "AppleLanguages"], stdin=subprocess.DEVNULL,
+                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=5).stdout
+            m = re.search(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]+)*", out or "")
+            tag = m.group(0) if m else ""
+        except (OSError, subprocess.SubprocessError):
             tag = ""
     tag = tag or os.environ.get("LC_ALL") or os.environ.get("LC_MESSAGES") or os.environ.get("LANG") or ""
     tag = tag.lower()
@@ -329,6 +514,8 @@ def readable_error(kind: str, exc: BaseException) -> YouTubeError:
     browser = BROWSERS.get(str(_settings.get("cookiesFromBrowser")))
     if kind == "cookies" and not browser:
         kind = "cookiefile"
+    elif kind == "cookies" and sys.platform == "darwin":
+        kind = "cookies-mac"  # no DPAPI there: the keychain holds Chromium's cookie key
     title, body = MESSAGES[kind][_lang()]
     fmt = {"browser": browser or "", "version": _active_version() or "?"}
     # a subclass named after the title, so the app's "<class>: <message>" reads as a sentence
@@ -351,7 +538,8 @@ def _ydl(opts: Dict[str, Any]) -> Any:
         "noplaylist": True,
         # YouTube's player challenges are solved with a JavaScript runtime when one is installed
         # (deno, Node.js or Bun) and the yt-dlp-ejs package; without one yt-dlp falls back to fewer formats
-        "js_runtimes": {"deno": {}, "node": {}, "bun": {}},
+        # (a flat search never runs YouTube's player, so it doesn't look for one: searches stay fast)
+        "js_runtimes": {"deno": {}, "node": {}, "bun": {}} if opts.get("extract_flat") else _js_runtimes(),
     }
     browser = str(_settings.get("cookiesFromBrowser") or "off")
     if browser in BROWSERS:
@@ -484,6 +672,7 @@ def resolve(item_or_url: Any, dest_dir: str, progress: Callable[..., None], canc
     url = _url(item_or_url)
     want_subs = _settings.get("subtitles", True)
     update_yt_dlp(progress)
+    ensure_js_runtime(progress, cancel)
     # 1. Download the highest bitrate audio stream as-is (no re-encode; KAREOKIE's separator
     #    decodes it once to 44.1 kHz float32) + subtitles
     out_tmpl = os.path.join(dest_dir, "raw_audio.%(ext)s")

@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "youtube",
   "name": "YouTube",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": "kareokie-ext-youtube contributors",
   "description": "Search YouTube and import videos you have the rights to use (audio, music video and the uploader's subtitles), with yt-dlp.",
   "homepage": "https://github.com/a8594755-maker/kareokie-ext-youtube",
@@ -63,7 +63,7 @@
       "type": "select",
       "default": "off",
       "label": "Use my YouTube sign-in from a browser",
-      "description": "Only if YouTube keeps asking to confirm you're not a bot. yt-dlp reads that browser's YouTube cookies and downloads as you. Firefox works best: on Windows, Chrome, Edge and Brave encrypt their cookies, which usually can't be read. YouTube may restrict an account that downloads a lot.",
+      "description": "Only if YouTube keeps asking to confirm you're not a bot. yt-dlp reads that browser's YouTube cookies and downloads as you. Firefox works best: on Windows, Chrome, Edge and Brave encrypt their cookies, which usually can't be read. On a Mac, macOS asks for your password to let it read Chrome, Edge or Brave. YouTube may restrict an account that downloads a lot.",
       "options": [
         {"value": "off", "label": "Don't use", "i18n": {"zh-TW": {"label": "不使用"}, "ja": {"label": "使わない"}}},
         {"value": "firefox", "label": "Firefox"},
@@ -72,8 +72,8 @@
         {"value": "brave", "label": "Brave"}
       ],
       "i18n": {
-        "zh-TW": {"label": "使用瀏覽器的 YouTube 登入狀態", "description": "只在 YouTube 一直要求確認不是機器人時使用。yt-dlp 會讀取該瀏覽器的 YouTube Cookie，以你的帳號下載。Firefox 最可靠；Windows 上的 Chrome、Edge、Brave 會加密 Cookie，通常讀不到。下載量很大的帳號可能會被 YouTube 限制。"},
-        "ja": {"label": "ブラウザの YouTube ログインを使う", "description": "YouTube がボットではないことの確認を何度も求める場合のみ使ってください。yt-dlp がそのブラウザの YouTube の Cookie を読み取り、あなたのアカウントでダウンロードします。Firefox が最も確実です。Windows の Chrome・Edge・Brave は Cookie を暗号化しているため、通常は読み取れません。大量にダウンロードするアカウントは YouTube に制限されることがあります。"}
+        "zh-TW": {"label": "使用瀏覽器的 YouTube 登入狀態", "description": "只在 YouTube 一直要求確認不是機器人時使用。yt-dlp 會讀取該瀏覽器的 YouTube Cookie，以你的帳號下載。Firefox 最可靠；Windows 上的 Chrome、Edge、Brave 會加密 Cookie，通常讀不到。在 Mac 上讀取 Chrome、Edge、Brave 時，macOS 會要求輸入密碼。下載量很大的帳號可能會被 YouTube 限制。"},
+        "ja": {"label": "ブラウザの YouTube ログインを使う", "description": "YouTube がボットではないことの確認を何度も求める場合のみ使ってください。yt-dlp がそのブラウザの YouTube の Cookie を読み取り、あなたのアカウントでダウンロードします。Firefox が最も確実です。Windows の Chrome・Edge・Brave は Cookie を暗号化しているため、通常は読み取れません。Mac で Chrome・Edge・Brave を読み取るときは macOS がパスワードを求めます。大量にダウンロードするアカウントは YouTube に制限されることがあります。"}
       }
     },
     {

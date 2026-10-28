@@ -2,12 +2,14 @@
 Build the YouTube extension package.
 
     python build.py                                    unsigned dist/kareokie-ext-youtube-<version>.zip
+    python build.py --unsigned                         unsigned even when KAREOKIE_SIGNING_KEY is set (testing)
     python build.py --key <private.pem> --key-id <id>  signed dist/kareokie-ext-youtube-<version>.kext
                                                        (or set KAREOKIE_SIGNING_KEY / KAREOKIE_SIGNING_KEY_ID)
     python build.py ... --index <index.json> [--base-url https://.../]
                                                        also write a gallery index listing the package
 
 Uses kext.py (tools/kext.py in this repository, or ../tools/kext.py inside the KAREOKIE repository).
+Works on Windows and macOS. Files the Finder leaves behind (.DS_Store, ._*) are never packed.
 """
 
 from __future__ import annotations
@@ -16,9 +18,13 @@ import argparse
 import importlib.util
 import json
 import os
+import shutil
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# not part of the package; kext.pack() skips most of these itself, the Finder's files it doesn't know
+NOT_PACKED = shutil.ignore_patterns(".*", "dist", "_deps", "__pycache__", "keys", "tests", "*.pyc")
 
 
 def _kext():
@@ -38,11 +44,15 @@ def main() -> int:
     p.add_argument("--out", default=os.path.join(HERE, "dist"))
     p.add_argument("--index", default=None)
     p.add_argument("--base-url", default="")
+    p.add_argument("--unsigned", action="store_true", help="don't sign, even with a key in the environment")
     a = p.parse_args()
     kext = _kext()
     m = kext.read_manifest(HERE)
-    payload = kext.pack(HERE)
-    signed = bool(a.key and a.key_id)
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = os.path.join(tmp, "youtube")
+        shutil.copytree(HERE, folder, ignore=NOT_PACKED)
+        payload = kext.pack(folder)
+    signed = bool(a.key and a.key_id) and not a.unsigned
     if signed:
         with open(a.key, "rb") as f:
             data = kext.sign(payload, f.read(), a.key_id)

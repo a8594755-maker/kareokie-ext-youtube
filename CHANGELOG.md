@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.3 — 2026-10-27
+
+- macOS (Apple Silicon): the JavaScript runtime for YouTube's player challenges is found where Mac installers put it
+  (Homebrew, MacPorts, the deno / Bun installers, Volta, nvm), since an app started from the Finder doesn't see the
+  shell's PATH. Without a working one (Node.js 22+, deno 2.3+, Bun 1.2.11+) the first import downloads a pinned
+  deno, checked against its SHA-256, into the extension's data folder. Windows is unchanged.
+- macOS: readable errors follow the Mac's preferred language, and the browser sign-in error explains the keychain
+  prompt instead of Windows' cookie encryption.
+- `build.py --unsigned`, and the package never includes the Finder's `.DS_Store` / `._*` files.
+
 ## 1.0.2 — 2026-10-27
 
 - yt-dlp keeps itself up to date: imports check PyPI at most every 12 hours (and again after an error a newer
