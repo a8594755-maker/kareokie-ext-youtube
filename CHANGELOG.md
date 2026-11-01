@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.5 — 2026-11-01
+
+- Messages follow the app's language: newer KAREOKIE versions pass it to extensions (`locale`: English,
+  Traditional Chinese, Japanese, Korean); older ones fall back to the system's display language as before. Korean
+  is new. The progress shown while an import waits out a bot check (and while yt-dlp updates) is translated too.
+- When YouTube's "confirm you're not a bot" check blocks every try, the error now says what works on this computer:
+  with Firefox installed, signing in to YouTube there and choosing it in the settings; on Windows without Firefox,
+  exporting a cookies.txt (Chrome and Edge encrypt their cookies, so yt-dlp can't use them there); when a sign-in is
+  already set, checking it or exporting a fresh cookies.txt; and another network or waiting. The Firefox check only
+  looks for its profile files and reads no cookies.
+- Some blocks don't pass: one video can be blocked on every try while others play from the same network. A video
+  blocked through every retry is remembered for 6 hours, and importing it again tries once and reports at once
+  instead of waiting about a minute. A successful import forgets it.
+
 ## 1.0.4 — 2026-11-01
 
 - YouTube's "confirm you're not a bot" check no longer fails an import at once. It is often a passing flag on one

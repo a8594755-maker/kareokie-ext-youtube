@@ -38,7 +38,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def setup(context: Dict[str, Any]) -> None:
-    """Called by the app before every call: {settings, dataDir, appVersion, extensionId, version}."""
+    """Called by the app before every call: {settings, dataDir, appVersion, extensionId, version}, and in newer
+    apps {locale}: the app's language (en, zh-TW, ja, ko)."""
     _context.clear()
     _context.update(context or {})
     _settings.clear()
@@ -192,7 +193,7 @@ def update_yt_dlp(progress: Optional[Callable[..., None]] = None, after_error: b
         if _vtuple(latest) <= _vtuple(current):
             return False
         if progress is not None:
-            progress(None, f"Updating yt-dlp {current} → {latest}…")
+            progress(None, _text("updating", current=current, latest=latest))
         target = os.path.join(store, latest)
         tmp = target + ".tmp"
         shutil.rmtree(tmp, ignore_errors=True)
@@ -330,7 +331,7 @@ def ensure_js_runtime(progress: Optional[Callable[..., None]] = None,
     tmp = os.path.join(root, DENO_VERSION + ".tmp")
     try:
         if progress is not None:
-            progress(None, f"Downloading the JavaScript runtime for YouTube (deno {DENO_VERSION}, about 40 MB)…")
+            progress(None, _text("deno", version=DENO_VERSION))
         shutil.rmtree(tmp, ignore_errors=True)
         os.makedirs(tmp)
         archive = os.path.join(tmp, "deno.zip")
@@ -391,24 +392,32 @@ def ensure_js_runtime(progress: Optional[Callable[..., None]] = None,
 #
 # The app shows "YouTube couldn't finish: <exception class>: <message>", so the class carries a short
 # title and the message says what to do. Errors the app already explains (private, age-restricted,
-# region, removed, 429, network) pass through unchanged.
+# region, removed, 429, network) pass through unchanged. Messages and progress follow the app's language.
 # ---------------------------------------------------------------------------
 
 BROWSERS = {"firefox": "Firefox", "chrome": "Chrome", "edge": "Edge", "brave": "Brave"}
 
 MESSAGES: Dict[str, Dict[str, Tuple[str, str]]] = {
+    # the body is the start of the message: readable_error() adds what works on this computer (BLOCKED_HINTS)
     "blocked": {
-        "en": ("YouTube is blocking this network for now",
-               "It asked to confirm you’re not a bot. Turn off any VPN or proxy, switch to another network "
-               "(a phone hotspot works), or wait a few hours, then retry. If it keeps happening, choose your browser "
-               "under “Use my YouTube sign-in from a browser” in this extension’s settings."),
-        "zh-TW": ("YouTube 暫時擋下了這個網路",
-                  "它要求確認你不是機器人。請關閉 VPN 或 Proxy、換一個網路（例如手機熱點），或等幾個小時後再重試。"
-                  "一直發生的話，可以到擴充功能頁的 YouTube 設定，在「使用瀏覽器的 YouTube 登入狀態」選擇你的瀏覽器。"),
-        "ja": ("YouTube がこのネットワークを一時的にブロックしています",
-               "ボットではないことの確認を求められました。VPN やプロキシをオフにする、別のネットワーク（スマホのテザリングなど）に"
-               "切り替える、または数時間待ってから再試行してください。続く場合は、拡張機能ページの YouTube の設定で"
-               "「ブラウザの YouTube ログインを使う」からブラウザを選んでください。"),
+        "en": ("YouTube asked to confirm you’re not a bot",
+               "It kept asking on every try, so waiting a minute won’t help. What works on this computer:"),
+        "zh-TW": ("YouTube 要求確認你不是機器人",
+                  "每次重試都被擋下，再等一下也沒用。在這台電腦上可以這樣做："),
+        "ja": ("YouTube がボットではないことの確認を求めています",
+               "毎回ブロックされたため、少し待っても解決しません。このパソコンでできること："),
+        "ko": ("YouTube에서 로봇이 아닌지 확인을 요청했습니다",
+               "매번 차단되어 조금 기다려도 해결되지 않습니다. 이 PC에서 할 수 있는 방법:"),
+    },
+    "blocked-again": {
+        "en": ("YouTube asked to confirm you’re not a bot",
+               "This video was blocked the last time too, so it wasn’t tried again. What works on this computer:"),
+        "zh-TW": ("YouTube 要求確認你不是機器人",
+                  "這支影片上次也被擋下，所以這次沒有再等待重試。在這台電腦上可以這樣做："),
+        "ja": ("YouTube がボットではないことの確認を求めています",
+               "この動画は前回もブロックされたため、待って再試行はしていません。このパソコンでできること："),
+        "ko": ("YouTube에서 로봇이 아닌지 확인을 요청했습니다",
+               "이 동영상은 지난번에도 차단되어 이번에는 기다렸다가 다시 시도하지 않았습니다. 이 PC에서 할 수 있는 방법:"),
     },
     "cookies": {
         "en": ("Couldn’t read your YouTube sign-in from {browser}",
@@ -422,6 +431,10 @@ MESSAGES: Dict[str, Dict[str, Tuple[str, str]]] = {
                "{browser} がインストールされ YouTube にログインしていることを確認し、ブラウザを閉じてから再試行してください。"
                "Windows の Chrome・Edge・Brave は Cookie を暗号化しているため通常は読み取れません。Firefox が最も確実です。"
                "または拡張機能の設定の「ブラウザの YouTube ログインを使う」を「使わない」に戻してください。"),
+        "ko": ("{browser} 브라우저의 YouTube 로그인 정보를 읽지 못했습니다",
+               "{browser} 브라우저가 설치되어 있고 YouTube에 로그인되어 있는지 확인한 뒤, 브라우저를 닫고 다시 시도하세요. "
+               "Windows의 Chrome, Edge, Brave는 쿠키를 암호화하므로 보통 읽을 수 없습니다. Firefox가 가장 확실합니다. "
+               "또는 이 확장 프로그램 설정의 “브라우저의 YouTube 로그인 사용”을 “사용 안 함”으로 되돌리세요."),
     },
     "cookies-mac": {
         "en": ("Couldn’t read your YouTube sign-in from {browser}",
@@ -436,6 +449,11 @@ MESSAGES: Dict[str, Dict[str, Tuple[str, str]]] = {
                "Chrome・Edge・Brave では、キーチェーンにあるブラウザの「Safe Storage」項目を「security」が使うことを macOS が確認するので、"
                "Mac のパスワードを入力して「許可」を選んでください。"
                "または拡張機能の設定の「ブラウザの YouTube ログインを使う」を「使わない」に戻してください。"),
+        "ko": ("{browser} 브라우저의 YouTube 로그인 정보를 읽지 못했습니다",
+               "{browser} 브라우저가 설치되어 있고 YouTube에 로그인되어 있는지 확인한 뒤, 브라우저를 닫고 다시 시도하세요. "
+               "Chrome, Edge, Brave의 경우 키체인에 있는 브라우저의 “Safe Storage” 항목을 “security”가 사용하도록 허용할지 "
+               "macOS가 묻습니다. Mac 암호를 입력하고 “허용”을 선택하세요. "
+               "또는 이 확장 프로그램 설정의 “브라우저의 YouTube 로그인 사용”을 “사용 안 함”으로 되돌리세요."),
     },
     "cookiefile": {
         "en": ("Couldn’t read the cookies.txt file",
@@ -446,6 +464,9 @@ MESSAGES: Dict[str, Dict[str, Tuple[str, str]]] = {
         "ja": ("cookies.txt ファイルを読み取れませんでした",
                "拡張機能の設定のパスを確認してください。YouTube にログインしたブラウザから書き出した cookies.txt"
                "（Netscape 形式）である必要があります。または設定を空にしてください。"),
+        "ko": ("cookies.txt 파일을 읽지 못했습니다",
+               "이 확장 프로그램 설정의 경로를 확인하세요. YouTube에 로그인된 브라우저에서 내보낸 cookies.txt"
+               "(Netscape 형식)여야 합니다. 또는 설정을 비우세요."),
     },
     "changed": {
         "en": ("YouTube changed something yt-dlp can’t handle yet",
@@ -456,6 +477,100 @@ MESSAGES: Dict[str, Dict[str, Tuple[str, str]]] = {
         "ja": ("YouTube の変更に yt-dlp がまだ対応していません",
                "現在の yt-dlp {version} ではこの動画をダウンロードできませんでした。修正版が出ると拡張機能が自動で"
                " yt-dlp を更新します。しばらくしてから再試行してください。"),
+        "ko": ("YouTube의 변경 사항을 yt-dlp가 아직 처리하지 못합니다",
+               "현재 yt-dlp {version} 버전으로는 이 동영상을 다운로드할 수 없습니다. 수정 버전이 나오면 확장 프로그램이 "
+               "yt-dlp를 자동으로 업데이트합니다. 잠시 후 다시 시도하세요."),
+    },
+}
+
+# What works against a bot check that doesn't pass, on this computer: the user's own YouTube sign-in (Firefox, or a
+# cookies.txt on Windows, where yt-dlp can't read Chrome's and Edge's encrypted cookies), another network, or time.
+BLOCKED_HINTS: Dict[str, Dict[str, str]] = {
+    "firefox": {
+        "en": "Firefox is installed: sign in to YouTube in Firefox, then in this extension’s settings set “Use my "
+              "YouTube sign-in from a browser” to Firefox and retry.",
+        "zh-TW": "這台電腦有安裝 Firefox：在 Firefox 登入 YouTube，然後到擴充功能頁的 YouTube 設定，"
+                 "把「使用瀏覽器的 YouTube 登入狀態」設為 Firefox，再重試。",
+        "ja": "Firefox がインストールされています。Firefox で YouTube にログインし、拡張機能ページの YouTube の設定で"
+              "「ブラウザの YouTube ログインを使う」を Firefox にしてから再試行してください。",
+        "ko": "Firefox가 설치되어 있습니다. Firefox에서 YouTube에 로그인한 뒤, 확장 프로그램 페이지의 YouTube 설정에서 "
+              "“브라우저의 YouTube 로그인 사용”을 Firefox로 설정하고 다시 시도하세요.",
+    },
+    "cookies-txt": {
+        "en": "Chrome and Edge can’t be used for this on Windows: they encrypt their cookies. Instead, open a private "
+              "window, sign in to YouTube, export its cookies to a cookies.txt with a browser extension (see “Exporting "
+              "YouTube cookies” in yt-dlp’s wiki), close the window, and enter the file’s full path under “Or a "
+              "cookies.txt file” in this extension’s settings. Installing Firefox and choosing it under “Use my "
+              "YouTube sign-in from a browser” works too.",
+        "zh-TW": "Windows 上的 Chrome、Edge 會加密 Cookie，無法用在這裡。請改為開一個無痕視窗登入 YouTube，"
+                 "用瀏覽器擴充功能把 Cookie 匯出成 cookies.txt（做法見 yt-dlp wiki 的「Exporting YouTube cookies」），"
+                 "關閉無痕視窗後，把檔案的完整路徑填到擴充功能設定的「或使用 cookies.txt 檔案」。"
+                 "也可以安裝 Firefox，在「使用瀏覽器的 YouTube 登入狀態」選擇它。",
+        "ja": "Windows の Chrome・Edge は Cookie を暗号化しているため使えません。代わりにプライベートウィンドウで "
+              "YouTube にログインし、ブラウザ拡張機能で Cookie を cookies.txt に書き出して（yt-dlp の wiki の"
+              "「Exporting YouTube cookies」を参照）ウィンドウを閉じ、ファイルのフルパスを拡張機能の設定の"
+              "「または cookies.txt ファイル」に入力してください。Firefox をインストールして"
+              "「ブラウザの YouTube ログインを使う」で選ぶこともできます。",
+        "ko": "Windows의 Chrome과 Edge는 쿠키를 암호화하므로 여기에 사용할 수 없습니다. 대신 시크릿 창에서 YouTube에 "
+              "로그인하고, 브라우저 확장 프로그램으로 쿠키를 cookies.txt로 내보낸 뒤(yt-dlp 위키의 “Exporting YouTube "
+              "cookies” 참고) 창을 닫고, 파일의 전체 경로를 이 확장 프로그램 설정의 “또는 cookies.txt 파일”에 입력하세요. "
+              "Firefox를 설치해 “브라우저의 YouTube 로그인 사용”에서 선택해도 됩니다.",
+    },
+    "browser": {
+        "en": "In this extension’s settings, set “Use my YouTube sign-in from a browser” to a browser you’re signed in "
+              "to YouTube with, then retry.",
+        "zh-TW": "到擴充功能頁的 YouTube 設定，把「使用瀏覽器的 YouTube 登入狀態」設為你已登入 YouTube 的瀏覽器，再重試。",
+        "ja": "拡張機能ページの YouTube の設定で「ブラウザの YouTube ログインを使う」を、YouTube にログインしている"
+              "ブラウザにしてから再試行してください。",
+        "ko": "확장 프로그램 페이지의 YouTube 설정에서 “브라우저의 YouTube 로그인 사용”을 YouTube에 로그인된 브라우저로 "
+              "설정하고 다시 시도하세요.",
+    },
+    "signed-in-browser": {
+        "en": "This already uses your YouTube sign-in from {browser}: open YouTube in {browser} to check you’re still "
+              "signed in, then retry.",
+        "zh-TW": "目前已經使用 {browser} 的 YouTube 登入狀態：請在 {browser} 開啟 YouTube 確認仍是登入狀態，再重試。",
+        "ja": "すでに {browser} の YouTube ログインを使っています。{browser} で YouTube を開いてログインしたままか"
+              "確認してから再試行してください。",
+        "ko": "이미 {browser} 브라우저의 YouTube 로그인을 사용하고 있습니다. {browser}에서 YouTube를 열어 로그인 상태인지 "
+              "확인한 뒤 다시 시도하세요.",
+    },
+    "signed-in-file": {
+        "en": "This already uses your cookies.txt, which may have expired: export a fresh one (see “Exporting YouTube "
+              "cookies” in yt-dlp’s wiki), then retry.",
+        "zh-TW": "目前已經使用 cookies.txt，它可能已經過期：請重新匯出一份（做法見 yt-dlp wiki 的「Exporting YouTube cookies」），再重試。",
+        "ja": "すでに cookies.txt を使っていますが、期限切れの可能性があります。書き出し直して（yt-dlp の wiki の"
+              "「Exporting YouTube cookies」を参照）から再試行してください。",
+        "ko": "이미 cookies.txt를 사용하고 있지만 만료되었을 수 있습니다. 새로 내보낸 뒤(yt-dlp 위키의 “Exporting YouTube "
+              "cookies” 참고) 다시 시도하세요.",
+    },
+    "network": {
+        "en": "Or switch to another network (a phone hotspot), turn off any VPN or proxy, or wait a few hours.",
+        "zh-TW": "或者換一個網路（例如手機熱點）、關閉 VPN 或 Proxy，或等幾個小時再試。",
+        "ja": "または別のネットワーク（スマホのテザリングなど）に切り替える、VPN やプロキシをオフにする、数時間待つ、"
+              "のいずれかを試してください。",
+        "ko": "또는 다른 네트워크(휴대폰 핫스팟 등)로 바꾸거나, VPN이나 프록시를 끄거나, 몇 시간 기다려 보세요.",
+    },
+}
+
+# progress messages, shown by the app while an import runs
+PROGRESS: Dict[str, Dict[str, str]] = {
+    "retry": {
+        "en": "YouTube asked to confirm this isn’t a bot; trying again in {delay} s ({attempt}/{total})…",
+        "zh-TW": "YouTube 要求確認不是機器人，{delay} 秒後重試（{attempt}/{total}）…",
+        "ja": "YouTube がボットではないことの確認を求めています。{delay} 秒後に再試行します（{attempt}/{total}）…",
+        "ko": "YouTube에서 로봇이 아닌지 확인을 요청했습니다. {delay}초 후 다시 시도합니다({attempt}/{total})…",
+    },
+    "updating": {
+        "en": "Updating yt-dlp {current} → {latest}…",
+        "zh-TW": "正在更新 yt-dlp {current} → {latest}…",
+        "ja": "yt-dlp を更新しています {current} → {latest}…",
+        "ko": "yt-dlp 업데이트 중 {current} → {latest}…",
+    },
+    "deno": {
+        "en": "Downloading the JavaScript runtime for YouTube (deno {version}, about 40 MB)…",
+        "zh-TW": "正在下載 YouTube 需要的 JavaScript 執行環境（deno {version}，約 40 MB）…",
+        "ja": "YouTube 用の JavaScript ランタイムをダウンロードしています（deno {version}、約 40 MB）…",
+        "ko": "YouTube에 필요한 JavaScript 런타임을 다운로드하는 중(deno {version}, 약 40MB)…",
     },
 }
 
@@ -472,8 +587,18 @@ class YouTubeError(Exception):
     """A yt-dlp failure explained for the user (the original error is chained for the technical details)."""
 
 
+def _lang_of(tag: str) -> str:
+    tag = tag.lower()
+    for prefix, lang in (("zh", "zh-TW"), ("ja", "ja"), ("ko", "ko")):
+        if tag.startswith(prefix):
+            return lang
+    return "en"
+
+
 def _lang() -> str:
-    """The user's language (the app doesn't pass its own; the system's display language is the best guess)."""
+    """The app's language (context["locale"], from newer apps), else the system's display language."""
+    if _context.get("locale"):
+        return _lang_of(str(_context["locale"]))
     tag = ""
     if sys.platform == "win32":
         try:
@@ -494,12 +619,43 @@ def _lang() -> str:
         except (OSError, subprocess.SubprocessError):
             tag = ""
     tag = tag or os.environ.get("LC_ALL") or os.environ.get("LC_MESSAGES") or os.environ.get("LANG") or ""
-    tag = tag.lower()
-    if tag.startswith("zh"):
-        return "zh-TW"
-    if tag.startswith("ja"):
-        return "ja"
-    return "en"
+    return _lang_of(tag)
+
+
+def _text(key: str, **fmt: Any) -> str:
+    """A progress message in the user's language."""
+    return PROGRESS[key][_lang()].format(**fmt)
+
+
+def _firefox_found() -> bool:
+    """Whether Firefox is installed with a profile yt-dlp could read (only looks for the files, reads nothing)."""
+    if sys.platform == "win32":
+        places = [os.path.join(os.environ.get("APPDATA", ""), "Mozilla", "Firefox")]
+    elif sys.platform == "darwin":
+        places = [os.path.expanduser("~/Library/Application Support/Firefox")]
+    else:
+        places = [os.path.expanduser("~/.mozilla/firefox"), os.path.expanduser("~/snap/firefox/common/.mozilla/firefox")]
+    for place in places:
+        profiles = glob.glob(os.path.join(place, "*", "cookies.sqlite")) + glob.glob(
+            os.path.join(place, "Profiles", "*", "cookies.sqlite"))
+        if os.path.isfile(os.path.join(place, "profiles.ini")) and profiles:
+            return True
+    return False
+
+
+def _blocked_hints() -> List[str]:
+    """Which BLOCKED_HINTS apply on this computer, with these settings."""
+    if _settings.get("cookiesFromBrowser") in BROWSERS:
+        hints = ["signed-in-browser"]
+    elif str(_settings.get("cookiesFile") or "").strip():
+        hints = ["signed-in-file"]
+    elif _firefox_found():
+        hints = ["firefox"]
+    elif sys.platform == "win32":
+        hints = ["cookies-txt"]
+    else:
+        hints = ["browser"]  # macOS and Linux read Chrome, Edge and Brave too
+    return hints + ["network"]
 
 
 def error_kind(exc: BaseException) -> Optional[str]:
@@ -510,13 +666,17 @@ def error_kind(exc: BaseException) -> Optional[str]:
     return None
 
 
-def readable_error(kind: str, exc: BaseException) -> YouTubeError:
+def readable_error(kind: str, exc: BaseException, again: bool = False) -> YouTubeError:
     browser = BROWSERS.get(str(_settings.get("cookiesFromBrowser")))
+    lang = _lang()
     if kind == "cookies" and not browser:
         kind = "cookiefile"
     elif kind == "cookies" and sys.platform == "darwin":
         kind = "cookies-mac"  # no DPAPI there: the keychain holds Chromium's cookie key
-    title, body = MESSAGES[kind][_lang()]
+    title, body = MESSAGES["blocked-again" if kind == "blocked" and again else kind][lang]
+    if kind == "blocked":
+        # Chinese and Japanese sentences follow each other without a space
+        body = ("" if lang in ("zh-TW", "ja") else " ").join([body] + [BLOCKED_HINTS[h][lang] for h in _blocked_hints()])
     fmt = {"browser": browser or "", "version": _active_version() or "?"}
     # a subclass named after the title, so the app's "<class>: <message>" reads as a sentence
     cls = type(title.format(**fmt), (YouTubeError,), {})
@@ -555,8 +715,12 @@ def _ydl(opts: Dict[str, Any]) -> Any:
 # YouTube's "confirm you're not a bot" check is often a passing flag on one request: the same import asked for
 # again 10-40 s later usually goes through. So a blocked call waits and tries again before it is reported.
 # Imports have time for the full wait; searches and metadata (the app gives them 40 s) try once more.
+# Some blocks don't pass, though: one video can be blocked on every try while others play from the same network,
+# and nothing in the error tells the two apart. So an import blocked through every retry is remembered for
+# BLOCKED_REMEMBER_SEC, and importing that video again tries once and reports what works without the wait.
 BLOCKED_RETRY_DELAYS_SEC = (5, 15, 30)
 BLOCKED_RETRY_DELAYS_QUICK_SEC = (3,)
+BLOCKED_REMEMBER_SEC = 6 * 3600
 
 
 def _wait(seconds: float, cancel: Optional[Callable[[], None]]) -> None:
@@ -571,38 +735,94 @@ def _wait(seconds: float, cancel: Optional[Callable[[], None]]) -> None:
         time.sleep(min(0.5, left))
 
 
+def _blocked_file() -> Optional[str]:
+    data = _context.get("dataDir")
+    return os.path.join(data, "blocked.json") if data else None
+
+
+def _read_blocked() -> Dict[str, float]:
+    path = _blocked_file()
+    try:
+        with open(path, encoding="utf-8") as f:  # type: ignore[arg-type]
+            seen = json.load(f)
+        return {str(k): float(v) for k, v in seen.items()} if isinstance(seen, dict) else {}
+    except (OSError, ValueError, TypeError, AttributeError):
+        return {}
+
+
+def _blocked_before(key: str) -> bool:
+    """Whether this video was blocked through every retry in the last BLOCKED_REMEMBER_SEC."""
+    return time.time() - _read_blocked().get(key, 0.0) < BLOCKED_REMEMBER_SEC
+
+
+def _remember_blocked(key: str, blocked: bool) -> None:
+    path = _blocked_file()
+    seen = _read_blocked()
+    if not path or (not blocked and key not in seen):
+        return
+    now = time.time()
+    seen = {k: t for k, t in seen.items() if now - t < BLOCKED_REMEMBER_SEC and k != key}
+    if blocked:
+        seen[key] = now
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path + ".tmp", "w", encoding="utf-8") as f:
+            json.dump(seen, f)
+        os.replace(path + ".tmp", path)
+    except OSError as exc:
+        print(f"[bot check] couldn't save {path}: {exc}")
+
+
 def _run(call: Callable[[], Any], progress: Optional[Callable[..., None]] = None, update: bool = False,
-         cancel: Optional[Callable[[], None]] = None) -> Any:
+         cancel: Optional[Callable[[], None]] = None, key: Optional[str] = None) -> Any:
     """Run a yt-dlp call with readable errors. With `update` (imports, which have time for pip): after an
     error a newer yt-dlp may fix, update yt-dlp and try once more. A call YouTube's bot check blocked is
-    tried again after a pause (see BLOCKED_RETRY_DELAYS_SEC)."""
+    tried again after a pause (see BLOCKED_RETRY_DELAYS_SEC), unless the video `key` was blocked through every
+    retry a short while ago."""
+
+    def attempt() -> Any:
+        result = call()
+        if key:
+            _remember_blocked(key, False)
+        return result
+
     try:
-        return call()
+        return attempt()
     except YouTubeError:
         raise
     except Exception as exc:  # noqa: BLE001
         kind = error_kind(exc)
         if update and kind in ("blocked", "changed") and update_yt_dlp(progress, after_error=True):
             try:
-                return call()
+                return attempt()
             except Exception as exc2:  # noqa: BLE001
                 exc, kind = exc2, error_kind(exc2)
-        delays = BLOCKED_RETRY_DELAYS_SEC if update else BLOCKED_RETRY_DELAYS_QUICK_SEC
-        for attempt, delay in enumerate(delays, 1):
+        again = kind == "blocked" and key is not None and _blocked_before(key)
+        delays = () if again else BLOCKED_RETRY_DELAYS_SEC if update else BLOCKED_RETRY_DELAYS_QUICK_SEC
+        if again:
+            print("[bot check] blocked, and blocked through every retry last time: not waiting again")
+        for n, delay in enumerate(delays, 1):
             if kind != "blocked":
                 break
-            print(f"[bot check] blocked, retry {attempt}/{len(delays)} in {delay} s")
+            print(f"[bot check] blocked, retry {n}/{len(delays)} in {delay} s")
             if progress is not None:
-                progress(None, f"YouTube asked to confirm this isn’t a bot; trying again in {delay} s "
-                               f"({attempt}/{len(delays)})…")
+                progress(None, _text("retry", delay=delay, attempt=n, total=len(delays)))
             _wait(delay, cancel)
             try:
-                return call()
+                return attempt()
             except Exception as exc2:  # noqa: BLE001
                 exc, kind = exc2, error_kind(exc2)
         if kind is None:
             raise exc
-        raise readable_error(kind, exc) from exc
+        if kind == "blocked" and key:
+            _remember_blocked(key, True)
+        raise readable_error(kind, exc, again=again) from exc
+
+
+def _video_key(url: str) -> str:
+    """The video id of a YouTube link (the same video under another link form is the same video), else the link."""
+    m = re.search(r"(?:[?&]v=|youtu\.be/|/(?:shorts|embed|live)/)([A-Za-z0-9_-]{11})", url)
+    return m.group(1) if m else url
 
 
 def _url(item_or_url: Any) -> str:
@@ -728,7 +948,7 @@ def resolve(item_or_url: Any, dest_dir: str, progress: Callable[..., None], canc
         with _ydl(ydl_audio_opts) as ydl:
             return ydl.extract_info(url, download=True) or {}
 
-    info = _run(call, progress, update=True, cancel=cancel)
+    info = _run(call, progress, update=True, cancel=cancel, key=_video_key(url))
 
     raw = ""
     for d in info.get("requested_downloads") or []:

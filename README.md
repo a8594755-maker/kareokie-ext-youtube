@@ -24,7 +24,10 @@ yt-dlp into the extension's data folder (`<dataDir>/yt-dlp/<version>/`); the new
 An error a newer yt-dlp may fix ("confirm you're not a bot", missing formats, HTTP 403) checks again sooner and
 retries the import once. A "confirm you're not a bot" check is often a passing flag on one request, so a
 blocked import also waits and tries again (after 5, 15 and 30 s; searches once, after 3 s) before it reports
-the error. With a JavaScript runtime installed (deno, Node.js or Bun), yt-dlp solves YouTube's
+the error. That error says what works on this computer: the user's own YouTube sign-in (Firefox when it is installed;
+on Windows otherwise a cookies.txt, since yt-dlp can't read Chrome's and Edge's encrypted cookies there), another
+network, or waiting. Some blocks don't pass, so a video blocked through every retry is remembered for 6 hours and
+importing it again reports at once instead of waiting (`<dataDir>/blocked.json`). With a JavaScript runtime installed (deno, Node.js or Bun), yt-dlp solves YouTube's
 player challenges with it and finds every format.
 
 ### macOS (Apple Silicon)
@@ -42,7 +45,12 @@ The extension runs in KAREOKIE's own Python on the Mac too; nothing is Windows-o
 - **Browser sign-in.** Firefox, Chrome, Edge and Brave work. For Chrome, Edge and Brave macOS asks once to let
   `security` read the browser's "Safe Storage" keychain item. Safari isn't offered: its cookies need Full Disk
   Access for KAREOKIE.
-- Error messages follow the first of the Mac's preferred languages.
+- With an app that doesn't pass its language, error messages follow the first of the Mac's preferred languages.
+
+### Language
+
+Error and progress messages are in English, Traditional Chinese, Japanese or Korean: the app's language when the app
+passes it (`context["locale"]`), otherwise the system's display language.
 
 ## Settings
 
@@ -80,7 +88,8 @@ community project: KAREOKIE doesn't build, sign or ship it, and no private key i
 
 The interface is documented in KAREOKIE's `docs/extensions.md`. Each call runs in its own process:
 `search(query, limit)`, `resolve(item_or_url, dest_dir, progress, cancel, options)`,
-`fetch_video(...)`, `metadata(item_or_url)`; `setup(context)` receives the settings.
+`fetch_video(...)`, `metadata(item_or_url)`; `setup(context)` receives the settings (and, from newer
+apps, the app's `locale`). Tests (no network): `python -m unittest discover tests`.
 
 ## License
 
