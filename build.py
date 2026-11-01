@@ -24,7 +24,7 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # not part of the package; kext.pack() skips most of these itself, the Finder's files it doesn't know
-NOT_PACKED = shutil.ignore_patterns(".*", "dist", "_deps", "__pycache__", "keys", "tests", "*.pyc")
+NOT_PACKED = shutil.ignore_patterns(".*", "dist", "_deps", "__pycache__", "keys", "tests", "tools", "*.pyc")
 
 
 def _kext():
