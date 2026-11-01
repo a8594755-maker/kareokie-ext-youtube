@@ -552,9 +552,30 @@ def _ydl(opts: Dict[str, Any]) -> Any:
     return yt_dlp.YoutubeDL({**base, **opts})
 
 
-def _run(call: Callable[[], Any], progress: Optional[Callable[..., None]] = None, update: bool = False) -> Any:
+# YouTube's "confirm you're not a bot" check is often a passing flag on one request: the same import asked for
+# again 10-40 s later usually goes through. So a blocked call waits and tries again before it is reported.
+# Imports have time for the full wait; searches and metadata (the app gives them 40 s) try once more.
+BLOCKED_RETRY_DELAYS_SEC = (5, 15, 30)
+BLOCKED_RETRY_DELAYS_QUICK_SEC = (3,)
+
+
+def _wait(seconds: float, cancel: Optional[Callable[[], None]]) -> None:
+    """Sleep, polling the app's cancel() so a cancelled import stops right away."""
+    end = time.monotonic() + seconds
+    while True:
+        if cancel is not None:
+            cancel()
+        left = end - time.monotonic()
+        if left <= 0:
+            return
+        time.sleep(min(0.5, left))
+
+
+def _run(call: Callable[[], Any], progress: Optional[Callable[..., None]] = None, update: bool = False,
+         cancel: Optional[Callable[[], None]] = None) -> Any:
     """Run a yt-dlp call with readable errors. With `update` (imports, which have time for pip): after an
-    error a newer yt-dlp may fix, update yt-dlp and try once more."""
+    error a newer yt-dlp may fix, update yt-dlp and try once more. A call YouTube's bot check blocked is
+    tried again after a pause (see BLOCKED_RETRY_DELAYS_SEC)."""
     try:
         return call()
     except YouTubeError:
@@ -562,6 +583,19 @@ def _run(call: Callable[[], Any], progress: Optional[Callable[..., None]] = None
     except Exception as exc:  # noqa: BLE001
         kind = error_kind(exc)
         if update and kind in ("blocked", "changed") and update_yt_dlp(progress, after_error=True):
+            try:
+                return call()
+            except Exception as exc2:  # noqa: BLE001
+                exc, kind = exc2, error_kind(exc2)
+        delays = BLOCKED_RETRY_DELAYS_SEC if update else BLOCKED_RETRY_DELAYS_QUICK_SEC
+        for attempt, delay in enumerate(delays, 1):
+            if kind != "blocked":
+                break
+            print(f"[bot check] blocked, retry {attempt}/{len(delays)} in {delay} s")
+            if progress is not None:
+                progress(None, f"YouTube asked to confirm this isn’t a bot; trying again in {delay} s "
+                               f"({attempt}/{len(delays)})…")
+            _wait(delay, cancel)
             try:
                 return call()
             except Exception as exc2:  # noqa: BLE001
@@ -694,7 +728,7 @@ def resolve(item_or_url: Any, dest_dir: str, progress: Callable[..., None], canc
         with _ydl(ydl_audio_opts) as ydl:
             return ydl.extract_info(url, download=True) or {}
 
-    info = _run(call, progress, update=True)
+    info = _run(call, progress, update=True, cancel=cancel)
 
     raw = ""
     for d in info.get("requested_downloads") or []:

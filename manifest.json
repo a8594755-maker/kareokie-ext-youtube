@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "youtube",
   "name": "YouTube",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "author": "kareokie-ext-youtube contributors",
   "description": "Search YouTube and import videos you have the rights to use (audio, music video and the uploader's subtitles), with yt-dlp.",
   "homepage": "https://github.com/a8594755-maker/kareokie-ext-youtube",

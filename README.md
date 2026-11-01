@@ -22,7 +22,9 @@ into this extension's own folder (`pip install --target`), never into the app. Y
 extension keeps yt-dlp up to date by itself: imports check PyPI at most every 12 hours and install a newer
 yt-dlp into the extension's data folder (`<dataDir>/yt-dlp/<version>/`); the newer of the two copies is used.
 An error a newer yt-dlp may fix ("confirm you're not a bot", missing formats, HTTP 403) checks again sooner and
-retries the import once. With a JavaScript runtime installed (deno, Node.js or Bun), yt-dlp solves YouTube's
+retries the import once. A "confirm you're not a bot" check is often a passing flag on one request, so a
+blocked import also waits and tries again (after 5, 15 and 30 s; searches once, after 3 s) before it reports
+the error. With a JavaScript runtime installed (deno, Node.js or Bun), yt-dlp solves YouTube's
 player challenges with it and finds every format.
 
 ### macOS (Apple Silicon)

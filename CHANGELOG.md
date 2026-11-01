@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.4 — 2026-11-01
+
+- YouTube's "confirm you're not a bot" check no longer fails an import at once. It is often a passing flag on one
+  request (the same import asked for again 10-40 s later usually goes through), so a blocked import now waits and
+  tries again after 5, 15 and 30 s, showing the wait in its progress; cancelling the import stops the wait.
+  Searches and metadata look-ups try once more after 3 s. Only when every try is blocked does the error appear.
+
 ## 1.0.3 — 2026-10-27
 
 - macOS (Apple Silicon): the JavaScript runtime for YouTube's player challenges is found where Mac installers put it
