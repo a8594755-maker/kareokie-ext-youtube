@@ -52,8 +52,8 @@ The extension runs in KAREOKIE's own Python on the Mac too; nothing is Windows-o
 > **Don't sign in with your main account.** Downloading with an account may make YouTube restrict or disable it.
 > Use a separately created secondary account.
 
-With "Sign in to YouTube in a separate window" on, the next import opens Chrome (or Edge) with a profile of the
-extension's own (`<dataDir>/signin/profile`, started with `--user-data-dir` and `--remote-debugging-port=0`; the
+With "Sign in to YouTube in a separate window" on, an import YouTube blocks without a sign-in opens Chrome (or
+Edge) with a profile of the extension's own (`<dataDir>/signin/profile`, started with `--user-data-dir` and `--remote-debugging-port=0`; the
 user's usual profile is never touched).
 
 1. **Warning first, every time.** The window opens on a full-window red warning page, served by the extension on
@@ -69,10 +69,29 @@ user's usual profile is never touched).
 The sign-in is kept: yt-dlp downloads with it and saves the cookies YouTube refreshes back to it after every call
 (through a copy that replaces `cookies.txt` in one step, so a call killed mid-write can't break it). `dataDir`
 survives app restarts and extension updates, so there's no need to sign in again. When YouTube stops accepting it,
-the error says so and the next import opens the window again (warning first); the kept profile is usually still
+the error says so and the next blocked import opens the window again (warning first); the kept profile is usually still
 signed in, so it just closes again with fresh cookies. Only turning the setting off (sign-out) deletes the profile
 and the cookies. Cookie values are never logged or put in messages, and only yt-dlp's requests to YouTube / Google
 use them.
+
+### Using the account sparingly
+
+These limits keep account use to a minimum. They are responsible-use limits, not a way around YouTube's checks,
+and they can't guarantee the account won't be restricted.
+
+- **Anonymous first.** Searches, metadata, music videos and imports go without the account. Only an import that
+  YouTube's bot check blocked without it is tried with it. The anonymous 5 / 15 / 30 s waits are skipped then.
+- **Gently.** With the account: at most one retry (after 10 s), 1.5 s between requests (yt-dlp's
+  `sleep_interval_requests`), and one call at a time (a lock in `<dataDir>/account/`).
+- **A daily cap.** At most 30 imports a day with the account (`ACCOUNT_DAILY_CAP`). Past it, the import says
+  today's limit is reached: try tomorrow or another network.
+- **Stop at warning signs.** If a signed-in call is still blocked, or YouTube reports account trouble (unusual
+  traffic, HTTP 429 / too many requests, a suspended or terminated account), the account isn't used for 24 hours.
+  The user is told to check it in a browser and not to keep retrying. A sign-in that yt-dlp reports as no longer
+  valid isn't a warning sign: the next blocked import opens the sign-in window again.
+- **Music videos never** use the account. A blocked music video falls back to the thumbnail / embed as before.
+
+The counters live in `<dataDir>/account/usage.json`, which a sign-out keeps.
 
 ### Language
 

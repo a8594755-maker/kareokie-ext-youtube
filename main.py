@@ -523,6 +523,39 @@ MESSAGES: Dict[str, Dict[str, Tuple[str, str]]] = {
                "로그인을 위해 {browser} 브라우저를 시작하지 못했습니다. 다시 가져오거나, 이 확장 프로그램 설정에서 "
                "“별도 창에서 YouTube 로그인”을 끄세요."),
     },
+    "account-cap": {
+        "en": ("Today’s limit for downloading with your YouTube sign-in is reached",
+               "To keep that account safe, the extension downloads with it at most {cap} times a day. Try again "
+               "tomorrow, or switch to another network."),
+        "zh-TW": ("今天用帳號下載的次數已達上限",
+                  "今天用帳號下載的次數已達上限，明天再試或換網路。為了降低帳號被限制的風險，擴充功能每天最多用帳號下載 {cap} 次。"),
+        "ja": ("今日のアカウントでのダウンロード回数が上限に達しました",
+               "アカウントを守るため、拡張機能がアカウントでダウンロードするのは 1 日 {cap} 回までです。明日もう一度試すか、"
+               "別のネットワークに切り替えてください。"),
+        "ko": ("오늘 계정으로 다운로드할 수 있는 횟수를 모두 사용했습니다",
+               "계정을 보호하기 위해 확장 프로그램은 하루에 최대 {cap}번까지만 계정으로 다운로드합니다. 내일 다시 시도하거나 "
+               "다른 네트워크로 바꾸세요."),
+    },
+    "account-paused": {
+        "en": ("Stopped using your YouTube sign-in for 24 hours",
+               "YouTube still blocked the download with the sign-in, or reported trouble with that account, so the "
+               "extension won’t use the account until {until}. Open YouTube with that account in a browser to check "
+               "it’s fine, and don’t keep retrying. Imports still try without the sign-in meanwhile; another network "
+               "may work."),
+        "zh-TW": ("暫停使用 YouTube 登入 24 小時",
+                  "登入後 YouTube 仍然擋下下載，或回報這個帳號有問題，所以擴充功能在 {until} 之前不會再使用這個帳號。"
+                  "請用瀏覽器以該帳號開啟 YouTube 確認帳號正常，不要一直重試。這段期間匯入仍會在不登入的情況下嘗試；"
+                  "換一個網路也可能可以。"),
+        "ja": ("YouTube のログインの使用を 24 時間停止しました",
+               "ログインしても YouTube にダウンロードをブロックされたか、アカウントの問題が報告されたため、{until} まで"
+               "拡張機能はこのアカウントを使いません。ブラウザでそのアカウントの YouTube を開いて問題がないか確認し、"
+               "再試行を繰り返さないでください。その間もログインなしでの取り込みは試みます。別のネットワークなら使える"
+               "ことがあります。"),
+        "ko": ("YouTube 로그인 사용을 24시간 중지했습니다",
+               "로그인해도 YouTube가 다운로드를 차단했거나 해당 계정에 문제가 있다고 알려 와서, {until}까지 확장 프로그램은 "
+               "이 계정을 사용하지 않습니다. 브라우저에서 그 계정으로 YouTube를 열어 문제가 없는지 확인하고, 계속 다시 "
+               "시도하지 마세요. 그동안 가져오기는 로그인 없이 시도합니다. 다른 네트워크에서는 될 수도 있습니다."),
+    },
     "changed": {
         "en": ("YouTube changed something yt-dlp can’t handle yet",
                "yt-dlp {version} couldn’t download this video. The extension updates yt-dlp by itself as soon as a "
@@ -542,30 +575,31 @@ MESSAGES: Dict[str, Dict[str, Tuple[str, str]]] = {
 # cookies.txt on Windows, where yt-dlp can't read Chrome's and Edge's encrypted cookies), another network, or time.
 BLOCKED_HINTS: Dict[str, Dict[str, str]] = {
     "signin": {
-        "en": "Turn on “Sign in to YouTube in a separate window” in this extension’s settings: the next import opens "
-              "{chromium} with a profile of its own, separate from your usual one, where you sign in to YouTube "
-              "yourself. {main}",
-        "zh-TW": "到擴充功能設定開啟「在獨立視窗登入 YouTube」：下次匯入時會用獨立的設定檔開啟 {chromium}（和你平常用的分開），"
-                 "請自己在裡面登入 YouTube。{main}",
-        "ja": "拡張機能の設定で「別ウィンドウで YouTube にログイン」をオンにしてください。次の取り込みで、普段とは別の"
-              "専用プロファイルで {chromium} が開くので、そこでご自身で YouTube にログインします。{main}",
-        "ko": "이 확장 프로그램 설정에서 “별도 창에서 YouTube 로그인”을 켜세요. 다음에 가져올 때 평소 프로필과 분리된 전용 "
-              "프로필로 {chromium} 브라우저가 열리며, 거기서 직접 YouTube에 로그인하면 됩니다. {main}",
+        "en": "Turn on “Sign in to YouTube in a separate window” in this extension’s settings: when an import is "
+              "blocked without it, {chromium} opens with a profile of its own, separate from your usual one, where you "
+              "sign in to YouTube yourself. {main}",
+        "zh-TW": "到擴充功能設定開啟「在獨立視窗登入 YouTube」：不登入匯入被擋下時，會用獨立的設定檔開啟 {chromium}"
+                 "（和你平常用的分開），請自己在裡面登入 YouTube。{main}",
+        "ja": "拡張機能の設定で「別ウィンドウで YouTube にログイン」をオンにしてください。ログインなしの取り込みが"
+              "ブロックされたとき、普段とは別の専用プロファイルで {chromium} が開くので、そこでご自身で YouTube に"
+              "ログインします。{main}",
+        "ko": "이 확장 프로그램 설정에서 “별도 창에서 YouTube 로그인”을 켜세요. 로그인 없이 가져오기가 차단되면 평소 "
+              "프로필과 분리된 전용 프로필로 {chromium} 브라우저가 열리며, 거기서 직접 YouTube에 로그인하면 됩니다. {main}",
     },
     "signin-expired": {
         "en": "This used the YouTube sign-in from the extension’s sign-in window, and YouTube didn’t accept it: it may "
-              "have expired, or YouTube may be restricting that account. The next import opens the sign-in window "
+              "have expired, or YouTube may be restricting that account. The next import YouTube blocks opens the sign-in window "
               "again; check you’re signed in there, or sign in with another secondary account. Turning “Sign in to "
               "YouTube in a separate window” off signs out.",
         "zh-TW": "這次用的是擴充功能登入視窗裡的 YouTube 登入狀態，但 YouTube 不接受：可能已經過期，或 YouTube 正在限制這個帳號。"
-                 "下次匯入會再開啟登入視窗，請確認裡面仍是登入狀態，或改用另一個次要帳號登入。"
+                 "下次匯入被擋時會再開啟登入視窗，請確認裡面仍是登入狀態，或改用另一個次要帳號登入。"
                  "關閉「在獨立視窗登入 YouTube」即可登出。",
         "ja": "拡張機能のログインウィンドウでの YouTube ログインを使いましたが、YouTube に受け付けられませんでした。"
-              "期限切れか、YouTube がそのアカウントを制限している可能性があります。次の取り込みでログインウィンドウが"
+              "期限切れか、YouTube がそのアカウントを制限している可能性があります。次にブロックされた取り込みでログインウィンドウが"
               "再び開くので、ログインしたままか確認するか、別のサブアカウントでログインしてください。"
               "「別ウィンドウで YouTube にログイン」をオフにするとログアウトします。",
         "ko": "이번에는 확장 프로그램 로그인 창의 YouTube 로그인을 사용했지만 YouTube에서 받아들이지 않았습니다. 만료되었거나 "
-              "YouTube가 해당 계정을 제한하고 있을 수 있습니다. 다음에 가져올 때 로그인 창이 다시 열리니, 로그인 상태인지 "
+              "YouTube가 해당 계정을 제한하고 있을 수 있습니다. 다음에 가져오기가 차단되면 로그인 창이 다시 열리니, 로그인 상태인지 "
               "확인하거나 다른 보조 계정으로 로그인하세요. “별도 창에서 YouTube 로그인”을 끄면 로그아웃됩니다.",
     },
     "firefox": {
@@ -636,6 +670,24 @@ BLOCKED_HINTS: Dict[str, Dict[str, str]] = {
 
 # progress messages, shown by the app while an import runs
 PROGRESS: Dict[str, Dict[str, str]] = {
+    "account-try": {
+        "en": "Blocked without a sign-in; trying once with your YouTube sign-in…",
+        "zh-TW": "不登入時被擋下，改用你的 YouTube 登入狀態試一次…",
+        "ja": "ログインなしではブロックされたため、YouTube のログインで 1 回試しています…",
+        "ko": "로그인 없이 차단되어 YouTube 로그인으로 한 번 시도하는 중…",
+    },
+    "account-retry": {
+        "en": "Still blocked with the sign-in; one last try in {delay} s…",
+        "zh-TW": "登入後仍被擋下，{delay} 秒後再試最後一次…",
+        "ja": "ログインしてもブロックされました。{delay} 秒後に最後にもう 1 回試します…",
+        "ko": "로그인해도 차단되었습니다. {delay}초 후 마지막으로 한 번 더 시도합니다…",
+    },
+    "account-wait": {
+        "en": "Waiting for another download with your YouTube sign-in to finish…",
+        "zh-TW": "等待另一個使用 YouTube 登入的下載完成…",
+        "ja": "YouTube のログインを使う別のダウンロードが終わるのを待っています…",
+        "ko": "YouTube 로그인을 사용하는 다른 다운로드가 끝나기를 기다리는 중…",
+    },
     "signin-wait": {
         "en": "{main} Read the warning in the {browser} window that opened, then sign in to YouTube there. Waiting…",
         "zh-TW": "{main}請先看完剛開啟的 {browser} 視窗裡的警告，再在裡面登入 YouTube。等待登入中…",
@@ -756,7 +808,7 @@ def error_kind(exc: BaseException) -> Optional[str]:
 
 
 def readable_error(kind: str, exc: BaseException, again: bool = False, signed_in: bool = False,
-                   browser: Optional[str] = None) -> YouTubeError:
+                   browser: Optional[str] = None, extra: Optional[Dict[str, Any]] = None) -> YouTubeError:
     browser = browser or BROWSERS.get(str(_settings.get("cookiesFromBrowser")))
     lang = _lang()
     if kind == "cookies" and not browser:
@@ -768,10 +820,12 @@ def readable_error(kind: str, exc: BaseException, again: bool = False, signed_in
         # Chinese and Japanese sentences follow each other without a space
         body = ("" if lang in ("zh-TW", "ja") else " ").join([body] + [BLOCKED_HINTS[h][lang] for h in _blocked_hints(signed_in)])
     fmt = {"browser": browser or "", "version": _active_version() or "?",
-           "chromium": (_chromium() or ("Chrome",))[0] if kind == "blocked" else "", "main": MAIN_ACCOUNT[lang]}
+           "chromium": (_chromium() or ("Chrome",))[0] if kind == "blocked" else "", "main": MAIN_ACCOUNT[lang],
+           **(extra or {})}
     # a subclass named after the title, so the app's "<class>: <message>" reads as a sentence
     cls = type(title.format(**fmt), (YouTubeError,), {})
     err = cls(body.format(**fmt))
+    err.kind = kind  # type: ignore[attr-defined]
     err.__cause__ = exc
     return err
 
@@ -779,8 +833,8 @@ def readable_error(kind: str, exc: BaseException, again: bool = False, signed_in
 # ---------------------------------------------------------------------------
 # Sign-in in a window of its own
 #
-# With the "signIn" setting on, the next import opens Chrome (or Edge) with a profile that belongs to the extension
-# (<dataDir>/signin/profile, never the user's usual profile). It first shows a warning page, served on 127.0.0.1 by
+# With the "signIn" setting on, an import blocked without a sign-in opens Chrome (or Edge) with a profile that belongs
+# to the extension (<dataDir>/signin/profile, never the user's usual profile). It first shows a warning page, served on 127.0.0.1 by
 # the extension, that the user must accept (a checkbox: "I'm using a secondary account, not my main one") before it
 # goes on to YouTube's sign-in page; closing the window cancels. The user signs in there themselves; the extension
 # waits until youtube.com has a signed-in session, asks the browser for its youtube.com / google.com cookies over the
@@ -789,7 +843,7 @@ def readable_error(kind: str, exc: BaseException, again: bool = False, signed_in
 #
 # yt-dlp then downloads as that account and saves the cookies YouTube refreshes back to the file (through a copy that
 # replaces it in one step), so the sign-in lasts across imports, app restarts and extension updates (the app keeps
-# dataDir). When YouTube stops accepting it, the next import opens the window again (warning first); the kept
+# dataDir). When YouTube stops accepting it, the next blocked import opens the window again (warning first); the kept
 # profile is usually still signed in, so no password is needed. Only turning the setting off (sign-out) deletes
 # the profile and the file. Cookie values are never logged or put in messages.
 # The user's own cookies.txt or browser setting wins over this sign-in.
@@ -822,6 +876,8 @@ WARNING_PAGE: Dict[str, Dict[str, str]] = {
                 "or disable accounts that download. If it is your main Google account, its Gmail, photos and files "
                 "could be affected too.",
         "use": "Use a separately created secondary account.",
+        "limits": "The extension keeps account use to a minimum (only when YouTube blocks a download without it, at "
+                  "most {cap} a day), but can’t guarantee the account won’t be restricted.",
         "note": "This window uses a browser profile of the extension’s own, separate from your usual one. Closing it "
                 "cancels the sign-in.",
         "check": "I understand the risk, and I’m using a separately created secondary account",
@@ -832,6 +888,7 @@ WARNING_PAGE: Dict[str, Dict[str, str]] = {
         "risk": "KAREOKIE 的 YouTube 擴充功能會用你在這裡登入的帳號下載。用帳號下載可能讓 YouTube 限制或停用該帳號；"
                 "如果是你的主要 Google 帳號，同一個帳號裡的 Gmail、相片和雲端硬碟也可能受影響。",
         "use": "請使用另外申請的小帳號。",
+        "limits": "擴充功能會盡量少用這個帳號（只在不登入下載被擋時才用，每天最多 {cap} 次），但無法保證帳號不會被限制。",
         "note": "這個視窗使用擴充功能專用的瀏覽器設定檔，和你平常用的分開。關閉視窗即取消登入。",
         "check": "我了解風險，我使用的是另外申請的小帳號",
         "continue": "繼續前往登入",
@@ -842,6 +899,8 @@ WARNING_PAGE: Dict[str, Dict[str, str]] = {
                 "すると、YouTube がそのアカウントを制限または停止することがあります。メインの Google アカウントだと、"
                 "同じアカウントの Gmail、フォト、ドライブにも影響する可能性があります。",
         "use": "別に作成したサブアカウントを使ってください。",
+        "limits": "拡張機能はこのアカウントの使用を最小限にします（ログインなしのダウンロードがブロックされたときだけ、"
+                  "1 日最大 {cap} 回）が、制限されないことは保証できません。",
         "note": "このウィンドウは普段とは別の、拡張機能専用のブラウザプロファイルを使っています。閉じるとログインは"
                 "キャンセルされます。",
         "check": "リスクを理解しており、別に作成したサブアカウントを使います",
@@ -853,6 +912,8 @@ WARNING_PAGE: Dict[str, Dict[str, str]] = {
                 "해당 계정을 제한하거나 정지할 수 있습니다. 주 Google 계정이라면 같은 계정의 Gmail, 사진, 드라이브에도 "
                 "영향이 있을 수 있습니다.",
         "use": "별도로 만든 보조 계정을 사용하세요.",
+        "limits": "확장 프로그램은 이 계정 사용을 최소화하지만(로그인 없이 다운로드가 차단될 때만, 하루 최대 {cap}회) "
+                  "계정이 제한되지 않는다고 보장할 수는 없습니다.",
         "note": "이 창은 평소 프로필과 분리된 확장 프로그램 전용 브라우저 프로필을 사용합니다. 창을 닫으면 로그인이 "
                 "취소됩니다.",
         "check": "위험을 이해했으며, 별도로 만든 보조 계정을 사용합니다",
@@ -885,10 +946,6 @@ def _own_cookies_set() -> bool:
     """The user's own cookies.txt or browser setting, which win over the sign-in window."""
     return str(_settings.get("cookiesFromBrowser") or "off") in BROWSERS or bool(
         str(_settings.get("cookiesFile") or "").strip().strip('"'))
-
-
-def _using_signin() -> bool:
-    return bool(_settings.get("signIn")) and not _own_cookies_set() and _signin_cookies() is not None
 
 
 def sign_out() -> None:
@@ -1012,7 +1069,7 @@ def _cdp(ws_url: str, method: str, params: Optional[Dict[str, Any]] = None) -> D
 def _warning_html(lang: str) -> str:
     import html
 
-    t = {k: html.escape(v) for k, v in WARNING_PAGE[lang].items()}
+    t = {k: html.escape(v.format(cap=ACCOUNT_DAILY_CAP)) for k, v in WARNING_PAGE[lang].items()}
     return f"""<!doctype html>
 <html lang="{lang}"><head><meta charset="utf-8"><title>{t["heading"]}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1038,6 +1095,7 @@ button:disabled {{ background: rgba(255,255,255,.35); color: rgba(255,255,255,.8
 <h1>{t["heading"]}</h1>
 <p>{t["risk"]}</p>
 <p class="use">{t["use"]}</p>
+<p>{t["limits"]}</p>
 <p class="note">{t["note"]}</p>
 <form method="post" action="accept">
 <label><input type="checkbox" id="understood" name="understood" value="yes" required> {t["check"]}</label>
@@ -1133,8 +1191,9 @@ def _devtools_url(profile: str, proc: Any, cancel: Optional[Callable[[], None]])
 
 
 def _signed_in(cookies: List[Dict[str, Any]]) -> bool:
-    return any(str(c.get("domain", "")).endswith("youtube.com") and c.get("name") in SIGNED_IN_COOKIES
-               for c in cookies)
+    """What yt-dlp counts as signed in: youtube.com's LOGIN_INFO and one of its SAPISID cookies."""
+    names = {c.get("name") for c in cookies if str(c.get("domain", "")).endswith("youtube.com")}
+    return "LOGIN_INFO" in names and bool(names & set(SIGNED_IN_COOKIES))
 
 
 def _netscape(cookies: List[Dict[str, Any]]) -> str:
@@ -1289,7 +1348,8 @@ class _SignedInYDL:
 # ---------------------------------------------------------------------------
 
 
-def _ydl(opts: Dict[str, Any]) -> Any:
+def _ydl(opts: Dict[str, Any], account: bool = False, logger: Any = None) -> Any:
+    """A YoutubeDL. `account`: a call with the sign-in window's account (see "Using the account sparingly")."""
     yt_dlp = _yt_dlp()
     base: Dict[str, Any] = {
         "quiet": True,
@@ -1308,9 +1368,12 @@ def _ydl(opts: Dict[str, Any]) -> Any:
         if not os.path.isfile(cookie_file):
             raise readable_error("cookiefile", FileNotFoundError(cookie_file))
         base["cookiefile"] = cookie_file
-    elif browser not in BROWSERS and _using_signin():
+    elif account and browser not in BROWSERS:
         work = _cookie_work_copy()
         base["cookiefile"] = work
+        base["sleep_interval_requests"] = ACCOUNT_SLEEP_REQUESTS_SEC  # gently, one request at a time
+        if logger is not None:
+            base["logger"] = logger
         return _SignedInYDL(yt_dlp.YoutubeDL({**base, **opts}), work)
     return yt_dlp.YoutubeDL({**base, **opts})
 
@@ -1377,11 +1440,11 @@ def _remember_blocked(key: str, blocked: bool) -> None:
 
 
 def _run(call: Callable[[], Any], progress: Optional[Callable[..., None]] = None, update: bool = False,
-         cancel: Optional[Callable[[], None]] = None, key: Optional[str] = None) -> Any:
+         cancel: Optional[Callable[[], None]] = None, key: Optional[str] = None, wait_blocked: bool = True) -> Any:
     """Run a yt-dlp call with readable errors. With `update` (imports, which have time for pip): after an
     error a newer yt-dlp may fix, update yt-dlp and try once more. A call YouTube's bot check blocked is
     tried again after a pause (see BLOCKED_RETRY_DELAYS_SEC), unless the video `key` was blocked through every
-    retry a short while ago."""
+    retry a short while ago, or `wait_blocked` is off (the sign-in is tried next)."""
 
     def attempt() -> Any:
         result = call()
@@ -1401,7 +1464,7 @@ def _run(call: Callable[[], Any], progress: Optional[Callable[..., None]] = None
             except Exception as exc2:  # noqa: BLE001
                 exc, kind = exc2, error_kind(exc2)
         again = kind == "blocked" and key is not None and _blocked_before(key)
-        delays = () if again else BLOCKED_RETRY_DELAYS_SEC if update else BLOCKED_RETRY_DELAYS_QUICK_SEC
+        delays = () if again or not wait_blocked else BLOCKED_RETRY_DELAYS_SEC if update else BLOCKED_RETRY_DELAYS_QUICK_SEC
         if again:
             print("[bot check] blocked, and blocked through every retry last time: not waiting again")
         for n, delay in enumerate(delays, 1):
@@ -1419,18 +1482,194 @@ def _run(call: Callable[[], Any], progress: Optional[Callable[..., None]] = None
             raise exc
         if kind == "blocked" and key:
             _remember_blocked(key, True)
-        signed_in = kind == "blocked" and _using_signin()
-        if signed_in:
-            # the next import opens the sign-in window again: its profile is usually still signed in
-            with open(_refresh_marker(), "w", encoding="utf-8"):
-                pass
-        raise readable_error(kind, exc, again=again, signed_in=signed_in) from exc
+        raise readable_error(kind, exc, again=again) from exc
 
 
 def _video_key(url: str) -> str:
     """The video id of a YouTube link (the same video under another link form is the same video), else the link."""
     m = re.search(r"(?:[?&]v=|youtu\.be/|/(?:shorts|embed|live)/)([A-Za-z0-9_-]{11})", url)
     return m.group(1) if m else url
+
+
+# ---------------------------------------------------------------------------
+# Using the account sparingly
+#
+# The sign-in window's account is used as little and as gently as possible (limits for responsible use; nothing here
+# hides anything from YouTube, and no limit can promise the account won't be restricted):
+# - Anonymous first: searches, metadata, music videos and imports go without it. Only an import YouTube's bot check
+#   blocked without it is tried with it, right away instead of the anonymous 5 / 15 / 30 s waits.
+# - With the account: at most one retry, a pause between requests, one call at a time (a lock across processes).
+# - At most ACCOUNT_DAILY_CAP imports a day with it.
+# - Warning signs stop it for ACCOUNT_PAUSE_SEC: still blocked while signed in, or account trouble (unusual traffic,
+#   too many requests, a suspended or terminated account). The user is told to check the account, not to retry.
+#   A sign-in yt-dlp reports as no longer valid isn't a warning sign: the next blocked import opens the window again.
+# Counters live in <dataDir>/account/, which a sign-out keeps.
+# ---------------------------------------------------------------------------
+
+ACCOUNT_DAILY_CAP = 30
+ACCOUNT_PAUSE_SEC = 24 * 3600
+ACCOUNT_RETRY_DELAYS_SEC = (10,)
+ACCOUNT_SLEEP_REQUESTS_SEC = 1.5
+ACCOUNT_LOCK_WAIT_SEC = 25 * 60
+ACCOUNT_TROUBLE = ("unusual traffic", "http error 429", "too many requests", "your account has been",
+                   "account has been suspended", "account has been terminated", "account has been disabled")
+ACCOUNT_EXPIRED = ("cookies are no longer valid",)
+
+
+def _account_dir() -> str:
+    return os.path.join(_context.get("dataDir") or "", "account")
+
+
+def _account_state() -> Dict[str, Any]:
+    try:
+        with open(os.path.join(_account_dir(), "usage.json"), encoding="utf-8") as f:
+            state = json.load(f)
+        return state if isinstance(state, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_account_state(state: Dict[str, Any]) -> None:
+    folder = _account_dir()
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, "usage.json")
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        json.dump(state, f)
+    os.replace(path + ".tmp", path)
+
+
+def _today() -> str:
+    return time.strftime("%Y-%m-%d")
+
+
+def _account_uses_today() -> int:
+    state = _account_state()
+    return int(state.get("count") or 0) if state.get("day") == _today() else 0
+
+
+def _count_account_use() -> None:
+    _save_account_state(dict(_account_state(), day=_today(), count=_account_uses_today() + 1))
+
+
+def _account_paused_until() -> float:
+    until = float(_account_state().get("pausedUntil") or 0)
+    return until if until > time.time() else 0.0
+
+
+def _pause_account(reason: str) -> float:
+    until = time.time() + ACCOUNT_PAUSE_SEC
+    _save_account_state(dict(_account_state(), pausedUntil=until, pausedFor=reason))
+    print(f"[account] not using the sign-in for {ACCOUNT_PAUSE_SEC // 3600} h: {reason}")
+    return until
+
+
+def _until_text(until: float) -> str:
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(until))
+
+
+class _AccountLog:
+    """yt-dlp's logger on calls with the account: keeps its warnings to notice an invalid sign-in."""
+
+    def __init__(self) -> None:
+        self.warnings: List[str] = []
+
+    def debug(self, msg: str) -> None:
+        pass
+
+    def info(self, msg: str) -> None:
+        pass
+
+    def warning(self, msg: str) -> None:
+        self.warnings.append(str(msg))
+        print(f"[account] WARNING: {msg}")
+
+    def error(self, msg: str) -> None:
+        print(f"[account] {msg}")
+
+    def says(self, keys: Tuple[str, ...]) -> bool:
+        return any(k in w.lower() for w in self.warnings for k in keys)
+
+
+def _account_on() -> bool:
+    """The sign-in window is on (and not overruled by the user's own cookies.txt or browser setting)."""
+    return bool(_settings.get("signIn")) and not _own_cookies_set() and bool(_context.get("dataDir"))
+
+
+def _with_account(call_with: Callable[[bool, Any], Any], progress: Optional[Callable[..., None]],
+                  cancel: Optional[Callable[[], None]], blocked: YouTubeError) -> Any:
+    """An import the bot check blocked without the sign-in, tried with it within the limits above."""
+    cause = blocked.__cause__ or blocked
+    paused = _account_paused_until()
+    if paused:
+        raise readable_error("account-paused", cause, extra={"until": _until_text(paused)}) from cause
+    if _account_uses_today() >= ACCOUNT_DAILY_CAP:
+        raise readable_error("account-cap", cause, extra={"cap": ACCOUNT_DAILY_CAP}) from cause
+    folder = _account_dir()
+    os.makedirs(folder, exist_ok=True)
+    end = last_note = time.monotonic()
+    end += ACCOUNT_LOCK_WAIT_SEC
+    lock = _take_lock(folder)
+    while lock is None:  # one call with the account at a time
+        if time.monotonic() > end:
+            raise readable_error("blocked", cause)
+        if progress is not None and time.monotonic() - last_note > SIGNIN_PROGRESS_EVERY_SEC:
+            progress(None, _text("account-wait"))
+            last_note = time.monotonic()
+        _wait(1, cancel)
+        lock = _take_lock(folder)
+    try:
+        ensure_signin(progress, cancel)  # the sign-in window, when there's no working sign-in yet
+        _count_account_use()
+        if progress is not None:
+            progress(None, _text("account-try"))
+        print(f"[account] blocked without the sign-in: trying with it ({_account_uses_today()}/{ACCOUNT_DAILY_CAP} today)")
+        delays = (0,) + tuple(ACCOUNT_RETRY_DELAYS_SEC)
+        exc: BaseException = cause
+        for n, delay in enumerate(delays):
+            if n:
+                if progress is not None:
+                    progress(None, _text("account-retry", delay=delay))
+                _wait(delay, cancel)
+            log = _AccountLog()
+            try:
+                return call_with(True, log)
+            except YouTubeError:
+                raise
+            except Exception as err:  # noqa: BLE001
+                exc = err
+            low = str(exc).lower()
+            if log.says(ACCOUNT_EXPIRED):
+                # not the account's fault: the next import opens the window again (the profile usually still signed in)
+                with open(_refresh_marker(), "w", encoding="utf-8"):
+                    pass
+                raise readable_error("blocked", exc, signed_in=True) from exc
+            if any(k in low for k in ACCOUNT_TROUBLE) or log.says(ACCOUNT_TROUBLE):
+                break
+            if error_kind(exc) != "blocked":
+                kind = error_kind(exc)
+                if kind is None:
+                    raise exc
+                raise readable_error(kind, exc) from exc
+        until = _pause_account(str(exc).splitlines()[0][:200])
+        raise readable_error("account-paused", exc, extra={"until": _until_text(until)}) from exc
+    finally:
+        try:
+            os.remove(lock)
+        except OSError:
+            pass
+
+
+def _download(call_with: Callable[[bool, Any], Any], progress: Optional[Callable[..., None]],
+              cancel: Optional[Callable[[], None]], key: str) -> Any:
+    """An import: anonymous first; with the sign-in window on, a bot check goes on to the account."""
+    if not _account_on():
+        return _run(lambda: call_with(False, None), progress, update=True, cancel=cancel, key=key)
+    try:
+        return _run(lambda: call_with(False, None), progress, update=True, cancel=cancel, key=key, wait_blocked=False)
+    except YouTubeError as err:
+        if getattr(err, "kind", None) != "blocked":
+            raise
+        return _with_account(call_with, progress, cancel, err)
 
 
 def _url(item_or_url: Any) -> str:
@@ -1535,7 +1774,6 @@ def resolve(item_or_url: Any, dest_dir: str, progress: Callable[..., None], canc
     want_subs = _settings.get("subtitles", True)
     update_yt_dlp(progress)
     ensure_js_runtime(progress, cancel)
-    ensure_signin(progress, cancel)
     # 1. Download the highest bitrate audio stream as-is (no re-encode; KAREOKIE's separator
     #    decodes it once to 44.1 kHz float32) + subtitles
     out_tmpl = os.path.join(dest_dir, "raw_audio.%(ext)s")
@@ -1553,11 +1791,11 @@ def resolve(item_or_url: Any, dest_dir: str, progress: Callable[..., None], canc
         "progress_hooks": [_hook(progress, cancel)],
     }
 
-    def call() -> Dict[str, Any]:
-        with _ydl(ydl_audio_opts) as ydl:
+    def call_with(account: bool, logger: Any) -> Dict[str, Any]:
+        with _ydl(ydl_audio_opts, account=account, logger=logger) as ydl:
             return ydl.extract_info(url, download=True) or {}
 
-    info = _run(call, progress, update=True, cancel=cancel, key=_video_key(url))
+    info = _download(call_with, progress, cancel, _video_key(url))
 
     raw = ""
     for d in info.get("requested_downloads") or []:
@@ -1610,7 +1848,8 @@ def _video_in(dest_dir: str) -> Optional[str]:
 
 def fetch_video(item_or_url: Any, dest_dir: str, progress: Callable[..., None], cancel: Callable[[], None],
                 options: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-    """The music video, video-only, at most the height the app asks for (its `videoQuality` setting)."""
+    """The music video, video-only, at most the height the app asks for (its `videoQuality` setting). Never with the
+    sign-in window's account: a blocked video falls back to the thumbnail / YouTube embed."""
     if not _settings.get("downloadVideo", True):
         return None
     height = int((options or {}).get("videoMaxHeight") or 0)

@@ -4,7 +4,6 @@ python -m unittest discover tests"""
 import os
 import sys
 import tempfile
-import time
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -183,7 +182,7 @@ class LanguageTest(unittest.TestCase):
         main._chromium = lambda: ("Edge", "msedge.exe")
         text = str(self.blocked("en"))
         self.assertIn("Turn on “Sign in to YouTube in a separate window”", text)
-        self.assertIn("opens Edge with a profile of its own", text)
+        self.assertIn("Edge opens with a profile of its own", text)
         self.assertIn("Don’t sign in with your main account", text)
         self.assertNotIn("Chrome and Edge can’t be used", text)
         self.assertIn("請勿登入主帳號：用帳號下載可能讓 YouTube 限制或停用該帳號", str(self.blocked("zh-TW")))

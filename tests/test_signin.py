@@ -22,6 +22,8 @@ SIGNED_IN = [
      "httpOnly": True, "expires": 1830000000.5, "session": False},
     {"domain": ".youtube.com", "name": "SAPISID", "value": "sap", "path": "/", "secure": True,
      "httpOnly": False, "expires": 1830000000, "session": False},
+    {"domain": ".youtube.com", "name": "LOGIN_INFO", "value": "li", "path": "/", "secure": True,
+     "httpOnly": True, "expires": 1830000000, "session": False},
     {"domain": ".google.com", "name": "SID", "value": "g", "path": "/", "secure": False,
      "httpOnly": False, "expires": -1, "session": True},
     {"domain": "www.example.com", "name": "other", "value": "x", "path": "/", "secure": False,
@@ -75,10 +77,15 @@ class FakeBrowser:
         self.closed = True
 
 
-class SignInTest(unittest.TestCase):
+class SignInBase(unittest.TestCase):
+    """A fake browser and DevTools; settings and a data folder of its own."""
+
     def setUp(self):
         self.saved = {k: getattr(main, k) for k in ("_chromium", "_launch_browser", "_devtools_url", "_cdp", "_wait",
-                                                     "_firefox_found", "update_yt_dlp", "BLOCKED_RETRY_DELAYS_SEC")}
+                                                     "_firefox_found", "update_yt_dlp", "BLOCKED_RETRY_DELAYS_SEC",
+                                                     "SIGNIN_TIMEOUT_SEC")}
+        self.saved_ydl, self.saved_quick = main._ydl, main.BLOCKED_RETRY_DELAYS_QUICK_SEC
+        main.SIGNIN_TIMEOUT_SEC = 5  # a test that never signs in can't hang
         self.data = tempfile.TemporaryDirectory()
         self.commands = []
         self.cookies = []  # what the browser has, per Storage.getCookies
@@ -119,6 +126,8 @@ class SignInTest(unittest.TestCase):
         self.cookies = [SIGNED_IN, SIGNED_IN]
         return main.ensure_signin(None, lambda: None)
 
+
+class SignInTest(SignInBase):
     def test_signs_in_writes_cookies_and_closes_the_window(self):
         self.cookies = [[], [SIGNED_IN[2]], SIGNED_IN, SIGNED_IN]  # Google first, then youtube.com
         messages = []
@@ -234,26 +243,6 @@ class SignInTest(unittest.TestCase):
         self.settings({"signIn": False})
         self.assertFalse(os.path.exists(os.path.join(self.data.name, "signin")))
 
-    def test_a_sign_in_youtube_doesnt_accept_is_refreshed_from_the_kept_profile(self):
-        path = self.sign_in()
-        self.assertTrue(main._using_signin())
-
-        def call():
-            raise RuntimeError(BLOCKED)
-
-        with self.assertRaises(main.YouTubeError) as err:
-            main._run(call, update=True, key="YJfHuATJYsQ")
-        self.assertIn("YouTube didn’t accept it", str(err.exception))
-        self.assertNotIn("Turn on", str(err.exception))
-        self.assertNotIn("sap", str(err.exception))
-        self.assertEqual(main._signin_cookies(), path)  # kept until the refresh replaces it
-        self.assertTrue(os.path.isdir(os.path.join(self.data.name, "signin", "profile")))
-        # the next import opens the window again, warning first; the profile is still signed in
-        self.browser = FakeBrowser()
-        self.assertEqual(self.sign_in(), path)
-        self.assertEqual(self.browser.page.count("<h1>"), 1)
-        self.assertFalse(os.path.exists(main._refresh_marker()))
-
     def test_yt_dlp_saves_refreshed_cookies_through_a_copy(self):
         path = self.sign_in()
         with open(path, encoding="utf-8") as f:
@@ -291,6 +280,168 @@ class SignInTest(unittest.TestCase):
         with main._SignedInYDL(FakeYDL(work, refreshed), work):
             pass
         self.assertFalse(os.path.exists(path))
+
+
+class AccountTest(SignInBase):
+    """Using the sign-in window's account sparingly: anonymous first, one retry, a daily cap, a pause on warning
+    signs. `call_with(account, logger)` stands for yt-dlp; the sign-in itself goes through the fake browser."""
+
+    def setUp(self):
+        super().setUp()
+        self.calls = []  # True / False: with the account or not
+        self.anonymous = [BLOCKED]  # what each call without the account raises (None: works)
+        self.signed = [None]  # with the account
+        self.warn = []  # yt-dlp warnings on calls with the account
+
+    def call_with(self, account, logger):
+        self.calls.append(account)
+        outcomes = self.signed if account else self.anonymous
+        outcome = outcomes.pop(0) if len(outcomes) > 1 else outcomes[0]
+        if account and logger is not None:
+            for w in self.warn:
+                logger.warning(w)
+        if outcome:
+            raise RuntimeError(outcome)
+        return {"ok": account}
+
+    def download(self, progress=None, cancel=lambda: None):
+        self.cookies = [SIGNED_IN, SIGNED_IN]
+        return main._download(self.call_with, progress, cancel, "YJfHuATJYsQ")
+
+    def test_anonymous_works_the_account_isnt_used(self):
+        self.anonymous = [None]
+        self.assertEqual(self.download(), {"ok": False})
+        self.assertEqual(self.calls, [False])
+        self.assertIsNone(self.browser.url)  # no sign-in window
+        self.assertEqual(main._account_uses_today(), 0)
+
+    def test_blocked_without_goes_on_to_the_account_at_once(self):
+        messages = []
+        self.assertEqual(self.download(lambda p, m: messages.append(m)), {"ok": True})
+        self.assertEqual(self.calls, [False, True])  # no anonymous 5 / 15 / 30 s waits first
+        self.assertIn("trying once with your YouTube sign-in", messages[-1])
+        self.assertEqual(main._account_uses_today(), 1)
+
+    def test_other_errors_dont_use_the_account(self):
+        self.anonymous = ["ERROR: [youtube] abc: Private video"]
+        with self.assertRaises(RuntimeError):
+            self.download()
+        self.assertEqual(self.calls, [False])
+
+    def test_off_never_uses_the_account(self):
+        self.settings({"signIn": False})
+        main.BLOCKED_RETRY_DELAYS_SEC = (0.01,)
+        with self.assertRaises(main.YouTubeError):
+            self.download()
+        self.assertEqual(self.calls, [False, False])  # the anonymous retry, nothing else
+
+    def test_at_most_one_retry_then_a_24_hour_pause(self):
+        self.signed = [BLOCKED]
+        with self.assertRaises(main.YouTubeError) as err:
+            self.download()
+        self.assertEqual(self.calls, [False, True, True])
+        self.assertEqual(err.exception.kind, "account-paused")
+        self.assertIn("won’t use the account until", str(err.exception))
+        self.assertIn("don’t keep retrying", str(err.exception))
+        # paused: the next import doesn't touch the account
+        self.calls.clear()
+        with self.assertRaises(main.YouTubeError) as err:
+            self.download()
+        self.assertEqual(self.calls, [False])
+        self.assertEqual(err.exception.kind, "account-paused")
+        # 24 hours later it may be used again
+        state = main._account_state()
+        state["pausedUntil"] = 1
+        main._save_account_state(state)
+        self.signed = [None]
+        self.calls.clear()
+        self.assertEqual(self.download(), {"ok": True})
+
+    def test_account_trouble_pauses_without_a_retry(self):
+        self.signed = ["ERROR: [youtube] abc: HTTP Error 429: Too Many Requests"]
+        with self.assertRaises(main.YouTubeError) as err:
+            self.download()
+        self.assertEqual(self.calls, [False, True])
+        self.assertEqual(err.exception.kind, "account-paused")
+        self.assertGreater(main._account_paused_until(), 0)
+
+    def test_an_invalid_sign_in_is_refreshed_not_paused(self):
+        path = os.path.join(self.data.name, "signin", "cookies.txt")
+        self.signed = [BLOCKED]
+        self.warn = ["The provided YouTube account cookies are no longer valid. They have likely been rotated"]
+        with self.assertRaises(main.YouTubeError) as err:
+            self.download()
+        self.assertEqual(self.calls, [False, True])
+        self.assertIn("YouTube didn’t accept it", str(err.exception))
+        self.assertNotIn("sap", str(err.exception))
+        self.assertEqual(main._account_paused_until(), 0)
+        self.assertTrue(os.path.isfile(path))  # kept until the refresh replaces it
+        self.assertTrue(os.path.exists(main._refresh_marker()))
+        # the next blocked import opens the window again, warning first (the profile is still signed in)
+        self.browser = FakeBrowser()
+        self.signed, self.warn = [None], []
+        self.assertEqual(self.download(), {"ok": True})
+        self.assertEqual(self.browser.page.count("<h1>"), 1)
+        self.assertFalse(os.path.exists(main._refresh_marker()))
+
+    def test_daily_cap(self):
+        main._save_account_state({"day": main._today(), "count": main.ACCOUNT_DAILY_CAP - 1})
+        self.assertEqual(self.download(), {"ok": True})
+        self.calls.clear()
+        self.settings({"signIn": True}, locale="zh-TW")
+        with self.assertRaises(main.YouTubeError) as err:
+            self.download()
+        self.assertEqual(self.calls, [False])
+        self.assertEqual(type(err.exception).__name__, "今天用帳號下載的次數已達上限")
+        self.assertIn("明天再試或換網路", str(err.exception))
+        # a new day
+        main._save_account_state({"day": "2000-01-01", "count": 99})
+        self.calls.clear()
+        self.assertEqual(self.download(), {"ok": True})
+
+    def test_one_call_with_the_account_at_a_time(self):
+        os.makedirs(main._account_dir(), exist_ok=True)
+        with open(os.path.join(main._account_dir(), ".lock"), "w"):
+            pass  # another import is using the account
+        polls = []
+
+        def cancel():
+            polls.append(1)
+            if len(polls) > 5:
+                raise Cancelled()
+
+        with self.assertRaises(Cancelled):
+            self.download(cancel=cancel)
+        self.assertEqual(self.calls, [False])
+
+    def test_searches_metadata_and_music_videos_never_use_the_account(self):
+        seen = []
+
+        def ydl(opts, account=False, logger=None):
+            seen.append(account)
+            raise RuntimeError(BLOCKED)
+
+        main._ydl = ydl
+        main.BLOCKED_RETRY_DELAYS_QUICK_SEC = (0.01,)
+        try:
+            with self.assertRaises(main.YouTubeError):
+                main.search("擱淺", 5)
+            with self.assertRaises(main.YouTubeError):
+                main.metadata("YJfHuATJYsQ")
+            self.assertIsNone(main.fetch_video("YJfHuATJYsQ", self.data.name, lambda *a: None, lambda: None,
+                                               {"videoMaxHeight": 720}))
+        finally:
+            main._ydl = self.saved_ydl
+            main.BLOCKED_RETRY_DELAYS_QUICK_SEC = self.saved_quick
+        self.assertEqual(seen, [False] * len(seen))
+        self.assertGreaterEqual(len(seen), 5)
+        self.assertIsNone(self.browser.url)
+
+    def test_warning_page_says_use_is_limited_but_not_guaranteed(self):
+        self.download()
+        self.assertIn(f"at most {main.ACCOUNT_DAILY_CAP} a day", self.browser.page)
+        self.assertIn("can’t guarantee", self.browser.page)
+        self.assertIn("無法保證帳號不會被限制", main._warning_html("zh-TW"))
 
 
 class WebSocketTest(unittest.TestCase):
