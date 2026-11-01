@@ -1,12 +1,16 @@
 """
 KAREOKIE YouTube source extension (yt-dlp).
 
-Implements the KAREOKIE source interface (docs/extensions.md in the KAREOKIE repository):
+Implements the KAREOKIE extension protocol, version 1 (PROTOCOL.md in the public extension SDK,
+https://github.com/a8594755-maker/kareokie-extension-sdk):
     search(query, limit)                               -> [{id, title, artist, durationSec, thumbnailUrl, url, extra}]
     resolve(item_or_url, dest_dir, progress, cancel)   -> {audio_path, subtitles, metadata}
     fetch_video(item_or_url, dest_dir, progress, cancel, options) -> {video_path} | None   (AV1 > VP9 > H.264)
     metadata(item_or_url)                              -> {title, artist, duration, thumbnail, source_url, query_hints}
+    action(action_id, progress, cancel, options)       -> {ok, message}   (apps with context["features"] "actions")
 URLs are routed here by the manifest's `urlPatterns`. Every call runs in its own process, started by the app.
+The extension relies only on that protocol: what newer apps can do is read from the context (`appVersion`, `locale`,
+`features`), and it writes only to `dataDir` and the song folder.
 
 yt-dlp has to keep up with YouTube, so the extension keeps its own copy up to date (see "yt-dlp updates") and
 turns the yt-dlp errors people actually hit into advice they can act on (see "Readable errors").
@@ -375,7 +379,7 @@ def ensure_js_runtime(progress: Optional[Callable[..., None]] = None,
         return os.path.join(target, "deno")
     except Exception as exc:  # noqa: BLE001 - offline, GitHub down…: yt-dlp goes on without a runtime
         if "cancel" in type(exc).__name__.lower():
-            raise  # the user cancelled the import (the runner's cancel())
+            raise  # the user cancelled the import (the app's cancel())
         print(f"[deno] download skipped: {exc}")
         with open(failed, "w", encoding="utf-8"):
             pass
@@ -391,9 +395,10 @@ def ensure_js_runtime(progress: Optional[Callable[..., None]] = None,
 # ---------------------------------------------------------------------------
 # Readable errors
 #
-# The app shows "YouTube couldn't finish: <exception class>: <message>", so the class carries a short
-# title and the message says what to do. Errors the app already explains (private, age-restricted,
-# region, removed, 429, network) pass through unchanged. Messages and progress follow the app's language.
+# The app shows "YouTube couldn't finish: <message>"; apps before 0.2.8 put the exception class in front
+# ("<class>: <message>", see the protocol's Errors). So a message is a short title and what to do: in the message
+# from 0.2.8 on, as the class name before. Errors the app already explains (private, age-restricted, region,
+# removed, 429, network) pass through unchanged. Messages and progress follow the app's language.
 # ---------------------------------------------------------------------------
 
 MESSAGES: Dict[str, Dict[str, Tuple[str, str]]] = {
@@ -674,6 +679,12 @@ def _text(key: str, **fmt: Any) -> str:
     return PROGRESS[key][_lang()].format(**fmt)
 
 
+def _app_shows_class() -> bool:
+    """Apps before 0.2.8 show an error as "<exception class>: <message>" (context["appVersion"]; "dev": a checkout)."""
+    version = str(_context.get("appVersion") or "")
+    return version != "dev" and _vtuple(version) < (0, 2, 8)
+
+
 def _host_has_actions() -> bool:
     """The app shows an error's `action` as a button and calls action() (context["features"])."""
     return "actions" in (_context.get("features") or [])
@@ -696,10 +707,15 @@ def readable_error(kind: str, exc: BaseException, again: bool = False, browser: 
         # Chinese and Japanese sentences follow each other without a space
         body = ("" if lang in ("zh-TW", "ja") else " ").join([body, BLOCKED_HINTS["network"][lang]])
     fmt = {"browser": browser or "", "version": _active_version() or "?", "main": MAIN_ACCOUNT[lang], **(extra or {})}
-    # a subclass named after the title, so the app's "<class>: <message>" reads as a sentence
-    cls = type(title.format(**fmt), (YouTubeError,), {})
-    err = cls(body.format(**fmt))
+    title, text = title.format(**fmt), body.format(**fmt)
+    sentence = title + ("：" if lang in ("zh-TW", "ja") else ": ") + text
+    if _app_shows_class():
+        # a subclass named after the title, so the app's "<class>: <message>" reads as a sentence
+        err: YouTubeError = type(title, (YouTubeError,), {})(text)
+    else:
+        err = YouTubeError(sentence)
     err.kind = kind  # type: ignore[attr-defined]
+    err.sentence = sentence  # type: ignore[attr-defined]  # the whole message, for action() results
     if action == "signin":
         label, hint = ACTION_SIGNIN[lang]
         err.action = {"id": "signin", "label": label, "hint": hint}  # type: ignore[attr-defined]
@@ -1692,7 +1708,7 @@ def action(action_id: str, progress: Optional[Callable[..., None]] = None, cance
         try:
             ensure_signin(progress, cancel, force=True)
         except YouTubeError as err:
-            return {"ok": False, "message": f"{type(err).__name__}: {err}"}
+            return {"ok": False, "message": err.sentence}  # type: ignore[attr-defined]
         return {"ok": True, "message": _text("signin-done")}
     if action_id == "signout":
         sign_out()
@@ -1777,7 +1793,7 @@ def _metadata(info: Dict[str, Any], url: str) -> Dict[str, Any]:
         "thumbnail": info.get("thumbnail") or (f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg" if vid else ""),
         "source_url": info.get("webpage_url") or url,
         "item_id": vid,
-        # what KAREOKIE's lyrics search reads to build its queries
+        # what the app's lyrics search reads to build its queries
         "query_hints": {
             k: v for k, v in {
                 "title": info.get("title"),

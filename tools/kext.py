@@ -10,8 +10,8 @@ KAREOKIE extension packaging tool (standard library + `cryptography` for signing
                                                                     a gallery index for packages
 
 Packages are deterministic (sorted files, fixed timestamps, LF line endings), so the same source gives the same bytes.
-The private key never goes into a repository: keep it offline (extensions/keys/ is gitignored).
-See docs/extensions.md in the KAREOKIE repository.
+The private key never goes into a repository: keep it offline (keys/ is gitignored).
+The package format is described in the public extension SDK: https://github.com/a8594755-maker/kareokie-extension-sdk
 """
 
 from __future__ import annotations
@@ -167,7 +167,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         _write(path, key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
         pub = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
         print(f"public key ({a.key_id}): {_b64url(pub)}")
-        print("Add it to backend/app/sources/signing.py (OFFICIAL_KEYS) and keep the private key offline.")
+        print("Keep the private key offline and out of every repository.")
         return 0
     if a.cmd in ("pack", "sign"):
         m = read_manifest(a.folder)

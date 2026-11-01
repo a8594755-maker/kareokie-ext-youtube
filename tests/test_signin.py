@@ -284,7 +284,7 @@ class SignInTest(SignInBase):
         self.host("zh-TW")
         self.browser = FakeBrowser(accepts_at=None, closes_after=2)
         result = main.action("signin", None, lambda: None)
-        self.assertEqual(result, {"ok": False, "message": "YouTube 登入已取消: 登入視窗在登入前就被關閉了，需要時可以再試一次。"})
+        self.assertEqual(result, {"ok": False, "message": "YouTube 登入已取消：登入視窗在登入前就被關閉了，需要時可以再試一次。"})
 
     def test_signout_action(self):
         self.sign_in()

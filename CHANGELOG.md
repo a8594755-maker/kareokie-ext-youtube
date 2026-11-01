@@ -30,6 +30,11 @@
 - Removed the settings "Use my YouTube sign-in from a browser" and "Or a cookies.txt file"; values saved by 1.0.2-1.0.4
   are ignored. A saved "Chrome" there used to fail every import with "Couldn't read your YouTube sign-in from
   Chrome", which read like the extension couldn't open Chrome.
+- Separate from KAREOKIE: the extension relies only on the public extension protocol (the SDK's `PROTOCOL.md`).
+  It learns what a newer app can do only from the context (`appVersion`, `locale`, `features`), and builds with its
+  own `tools/kext.py` (no fallback into a KAREOKIE checkout). From app 0.2.8, which shows errors without the
+  exception class, a message's title is in the message itself; older apps still get it as the class name. The README
+  links only the public site and SDK.
 - Messages follow the app's language: newer KAREOKIE versions pass it to extensions (`locale`: English,
   Traditional Chinese, Japanese, Korean); older ones fall back to the system's display language as before. Korean
   is new. Progress messages (bot-check waits, the sign-in, yt-dlp updates) are translated too.

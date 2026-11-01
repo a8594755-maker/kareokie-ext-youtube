@@ -162,6 +162,24 @@ class LanguageTest(unittest.TestCase):
         self.assertEqual(str(self.blocked("en")), "It kept asking on every try, so waiting a minute won’t help. Switch to "
                          "another network (a phone hotspot), turn off any VPN or proxy, or wait a few hours.")
 
+    def test_title_in_the_message_from_app_0_2_8(self):
+        # 0.2.8 and later show only the message (the extension protocol's Errors); "dev" is a source checkout
+        for version in ("0.2.8", "0.3.0", "dev"):
+            main.setup({"settings": {}, "locale": "zh-TW", "appVersion": version})
+            err = main.readable_error("blocked", RuntimeError(BLOCKED))
+            self.assertEqual(type(err), main.YouTubeError, version)
+            self.assertTrue(str(err).startswith("YouTube 要求確認你不是機器人：每次重試都被擋下"), version)
+        main.setup({"settings": {}, "locale": "en", "appVersion": "0.2.8"})
+        self.assertTrue(str(main.readable_error("blocked", RuntimeError(BLOCKED))).startswith(
+            "YouTube asked to confirm you’re not a bot: It kept asking"))
+        # older apps put the class name in front: the title stays the class name there
+        for version in ("0.2.7", "0.1.0", None):
+            main.setup({"settings": {}, "locale": "zh-TW", **({"appVersion": version} if version else {})})
+            err = main.readable_error("blocked", RuntimeError(BLOCKED))
+            self.assertEqual(type(err).__name__, "YouTube 要求確認你不是機器人", version)
+            self.assertTrue(str(err).startswith("每次重試都被擋下"), version)
+            self.assertTrue(err.sentence.startswith("YouTube 要求確認你不是機器人：每次"), version)
+
     def test_no_settings_left_to_point_to(self):
         for lang in ("en", "zh-TW", "ja", "ko"):
             for kind, texts in main.MESSAGES.items():

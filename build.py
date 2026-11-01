@@ -8,7 +8,7 @@ Build the YouTube extension package.
     python build.py ... --index <index.json> [--base-url https://.../]
                                                        also write a gallery index listing the package
 
-Uses kext.py (tools/kext.py in this repository, or ../tools/kext.py inside the KAREOKIE repository).
+Uses this repository's own tools/kext.py (nothing outside this repository).
 Works on Windows and macOS. Files the Finder leaves behind (.DS_Store, ._*) are never packed.
 """
 
@@ -28,13 +28,13 @@ NOT_PACKED = shutil.ignore_patterns(".*", "dist", "_deps", "__pycache__", "keys"
 
 
 def _kext():
-    for path in (os.path.join(HERE, "tools", "kext.py"), os.path.join(HERE, "..", "tools", "kext.py")):
-        if os.path.isfile(path):
-            spec = importlib.util.spec_from_file_location("kext", path)
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)  # type: ignore[union-attr]
-            return mod
-    raise SystemExit("kext.py not found (expected tools/kext.py)")
+    path = os.path.join(HERE, "tools", "kext.py")
+    if not os.path.isfile(path):
+        raise SystemExit("tools/kext.py not found")
+    spec = importlib.util.spec_from_file_location("kext", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    return mod
 
 
 def main() -> int:

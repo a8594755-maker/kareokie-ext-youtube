@@ -1,6 +1,6 @@
 # kareokie-ext-youtube: a YouTube source for KAREOKIE
 
-A free, community-made **music source extension** for [KAREOKIE](https://github.com/a8594755-maker/KAREOKIE):
+A free, community-made **music source extension** for [KAREOKIE](https://kareokie.pages.dev):
 search YouTube and import videos you have the rights to use. KAREOKIE itself only imports local
 files; online sources like this one are separate extensions you choose to install.
 
@@ -41,8 +41,7 @@ The extension runs in KAREOKIE's own Python on the Mac too; nothing is Windows-o
   first import downloads deno (version and SHA-256 pinned in `main.py`, about 40 MB) into
   `<dataDir>/deno/<version>/`, executable and without `com.apple.quarantine`. When that download fails it is
   tried again 30 minutes later; yt-dlp works without a runtime meanwhile, with fewer formats.
-- **ffmpeg** isn't needed: audio and video are downloaded as-is. yt-dlp would find the app's bundled ffmpeg on the
-  PATH the app gives the extension.
+- **ffmpeg** isn't needed: audio and video are downloaded as-is.
 - **Sign-in window.** Chrome or Edge from `/Applications` (or `~/Applications`), the same as on Windows.
 - With an app that doesn't pass its language, error messages follow the first of the Mac's preferred languages.
 
@@ -101,7 +100,8 @@ The counters live in `<dataDir>/account/usage.json`, which a sign-out keeps.
 An app that shows action buttons passes `context["features"] = ["actions"]`; it reads an error's `action`
 attribute (`{"id", "label", "hint"}`, in the app's language) and calls `action(action_id, progress, cancel, options)`
 (→ `{"ok", "message"}`, `timeouts.action` = 900 s). The manifest lists the ids as a top-level `"actions"` key, not as
-a capability: current apps reject unknown capabilities but ignore unknown keys, so 1.0.5 still installs on them.
+a capability: protocol 1 adds new features as optional manifest keys, and apps that don't know the key ignore it,
+so 1.0.5 still installs on them.
 Older apps without `features` get the same sign-in from the import itself: a blocked import opens the sign-in window
 (warning first) and goes on once the user signed in.
 
@@ -122,8 +122,8 @@ saved by those versions are ignored.
 
 ## Install
 
-In KAREOKIE: search for a song → **Choose a music source** → YouTube → **Install**, or
-**Extensions** → **Install from file** with a `kareokie-ext-youtube-<version>.kext` package.
+In KAREOKIE: **Extensions** → **Install from file** with a `kareokie-ext-youtube-<version>.kext` (or `.zip`) package
+from this repository's releases.
 
 ## Updates
 
@@ -140,12 +140,17 @@ python build.py --key keys/kareokie-2026.private.pem --key-id kareokie-2026 --in
 ```
 
 `build.py` runs on Windows and macOS (tested with Python 3.12 on both) and never packs the Finder's `.DS_Store` / `._*` files.
-It uses `tools/kext.py` (copied from the KAREOKIE repository's `extensions/tools/`). This is a
-community project: KAREOKIE doesn't build, sign or ship it, and no private key is ever committed.
+It uses this repository's own `tools/kext.py` (the packaging tool of the [extension SDK](https://github.com/a8594755-maker/kareokie-extension-sdk)) and
+nothing outside this repository. This is a community project: KAREOKIE doesn't build, sign or ship it, and no
+private key is ever committed.
 
 ## Develop
 
-The interface is documented in KAREOKIE's `docs/extensions.md`. Each call runs in its own process:
+The extension follows the public extension protocol, version 1 ([`PROTOCOL.md` in the extension SDK](https://github.com/a8594755-maker/kareokie-extension-sdk))
+and nothing else of KAREOKIE: no app modules, files or settings outside `dataDir` and the song folder, and no
+special treatment of its id. What a newer app can do is read from the context: `appVersion` (from 0.2.8 errors are
+shown without the exception class, so the title goes into the message), `locale` and `features`. Each call runs in its
+own process:
 `search(query, limit)`, `resolve(item_or_url, dest_dir, progress, cancel, options)`,
 `fetch_video(...)`, `metadata(item_or_url)`, `action(action_id, progress, cancel, options)`; `setup(context)`
 receives the settings (and, from newer apps, the app's `locale` and `features`). Tests (no network, no browser):
