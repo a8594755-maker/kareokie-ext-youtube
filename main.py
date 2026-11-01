@@ -524,17 +524,17 @@ MESSAGES: Dict[str, Dict[str, Tuple[str, str]]] = {
                "“별도 창에서 YouTube 로그인”을 끄세요."),
     },
     "account-cap": {
-        "en": ("Today’s limit for downloading with your YouTube sign-in is reached",
-               "To keep that account safe, the extension downloads with it at most {cap} times a day. Try again "
-               "tomorrow, or switch to another network."),
-        "zh-TW": ("今天用帳號下載的次數已達上限",
-                  "今天用帳號下載的次數已達上限，明天再試或換網路。為了降低帳號被限制的風險，擴充功能每天最多用帳號下載 {cap} 次。"),
-        "ja": ("今日のアカウントでのダウンロード回数が上限に達しました",
-               "アカウントを守るため、拡張機能がアカウントでダウンロードするのは 1 日 {cap} 回までです。明日もう一度試すか、"
-               "別のネットワークに切り替えてください。"),
-        "ko": ("오늘 계정으로 다운로드할 수 있는 횟수를 모두 사용했습니다",
-               "계정을 보호하기 위해 확장 프로그램은 하루에 최대 {cap}번까지만 계정으로 다운로드합니다. 내일 다시 시도하거나 "
-               "다른 네트워크로 바꾸세요."),
+        "en": ("Reached today’s {cap} downloads with your YouTube sign-in",
+               "Stopping for today is recommended so the account isn’t restricted. To continue anyway, import again "
+               "and choose “I understand the risk, continue anyway” in the window that opens."),
+        "zh-TW": ("今天用帳號下載已達 {cap} 首",
+                  "建議今天先停，以免帳號被限制。如果仍要繼續，請再匯入一次，在跳出的視窗選擇「我了解風險，仍要繼續」。"),
+        "ja": ("今日のアカウントでのダウンロードが {cap} 曲に達しました",
+               "アカウントが制限されないよう、今日はここでやめることをおすすめします。それでも続ける場合は、もう一度取り込み、"
+               "開いたウィンドウで「リスクを理解した上で続ける」を選んでください。"),
+        "ko": ("오늘 계정으로 {cap}곡을 다운로드했습니다",
+               "계정이 제한되지 않도록 오늘은 여기서 멈추는 것을 권장합니다. 그래도 계속하려면 다시 가져온 뒤 열리는 창에서 "
+               "“위험을 이해했으며 계속합니다”를 선택하세요."),
     },
     "account-paused": {
         "en": ("Stopped using your YouTube sign-in for 24 hours",
@@ -681,6 +681,14 @@ PROGRESS: Dict[str, Dict[str, str]] = {
         "zh-TW": "登入後仍被擋下，{delay} 秒後再試最後一次…",
         "ja": "ログインしてもブロックされました。{delay} 秒後に最後にもう 1 回試します…",
         "ko": "로그인해도 차단되었습니다. {delay}초 후 마지막으로 한 번 더 시도합니다…",
+    },
+    "account-ask": {
+        "en": "Reached today’s {cap} downloads with your YouTube sign-in: choose in the {browser} window whether to "
+              "stop for today or continue…",
+        "zh-TW": "今天用帳號下載已達 {cap} 首，請在跳出的 {browser} 視窗選擇今天先停或繼續…",
+        "ja": "今日のアカウントでのダウンロードが {cap} 曲に達しました。開いた {browser} のウィンドウで、今日はやめるか"
+              "続けるかを選んでください…",
+        "ko": "오늘 계정으로 {cap}곡을 다운로드했습니다. 열린 {browser} 창에서 오늘은 멈출지 계속할지 선택하세요…",
     },
     "account-wait": {
         "en": "Waiting for another download with your YouTube sign-in to finish…",
@@ -869,6 +877,46 @@ MAIN_ACCOUNT: Dict[str, str] = {
           "별도로 만든 보조 계정을 사용하세요.",
 }
 
+# asked in the sign-in window when today's ACCOUNT_DAILY_CAP is reached
+CAP_PAGE: Dict[str, Dict[str, str]] = {
+    "en": {
+        "heading": "Reached today’s {cap} downloads with your YouTube sign-in",
+        "recommend": "Stopping for today is recommended, so the account isn’t restricted.",
+        "risk": "The more an account downloads, the more likely YouTube is to restrict or disable it.",
+        "note": "If you continue, you won’t be asked again today; the count starts over tomorrow. Closing this window "
+                "stops for today. Signs of trouble still stop the account for 24 hours.",
+        "stop": "Stop for today (recommended)",
+        "continue": "I understand the risk, continue anyway",
+    },
+    "zh-TW": {
+        "heading": "今天用帳號下載已達 {cap} 首",
+        "recommend": "建議今天先停，以免帳號被限制。",
+        "risk": "帳號下載得越多，YouTube 越可能限制或停用這個帳號。",
+        "note": "選擇繼續的話，今天剩下的時間不會再詢問，明天會重新計算。關閉這個視窗等於今天先停。"
+                "發現異常時仍會暫停使用帳號 24 小時。",
+        "stop": "今天先停（建議）",
+        "continue": "我了解風險，仍要繼續",
+    },
+    "ja": {
+        "heading": "今日のアカウントでのダウンロードが {cap} 曲に達しました",
+        "recommend": "アカウントが制限されないよう、今日はここでやめることをおすすめします。",
+        "risk": "ダウンロードが多いほど、YouTube がアカウントを制限または停止する可能性が高くなります。",
+        "note": "続ける場合、今日はもう確認しません。明日になると回数はリセットされます。このウィンドウを閉じると今日は"
+                "やめます。問題の兆候があれば、引き続きアカウントの使用を 24 時間停止します。",
+        "stop": "今日はやめる（おすすめ）",
+        "continue": "リスクを理解した上で続ける",
+    },
+    "ko": {
+        "heading": "오늘 계정으로 {cap}곡을 다운로드했습니다",
+        "recommend": "계정이 제한되지 않도록 오늘은 여기서 멈추는 것을 권장합니다.",
+        "risk": "다운로드가 많을수록 YouTube가 계정을 제한하거나 정지할 가능성이 커집니다.",
+        "note": "계속하면 오늘은 더 묻지 않으며, 내일 횟수가 다시 시작됩니다. 이 창을 닫으면 오늘은 멈춥니다. 문제 징후가 "
+                "보이면 여전히 계정 사용을 24시간 중지합니다.",
+        "stop": "오늘은 멈추기(권장)",
+        "continue": "위험을 이해했으며 계속합니다",
+    },
+}
+
 WARNING_PAGE: Dict[str, Dict[str, str]] = {
     "en": {
         "heading": "Don’t sign in with your main account",
@@ -876,8 +924,8 @@ WARNING_PAGE: Dict[str, Dict[str, str]] = {
                 "or disable accounts that download. If it is your main Google account, its Gmail, photos and files "
                 "could be affected too.",
         "use": "Use a separately created secondary account.",
-        "limits": "The extension keeps account use to a minimum (only when YouTube blocks a download without it, at "
-                  "most {cap} a day), but can’t guarantee the account won’t be restricted.",
+        "limits": "The extension keeps account use to a minimum (only when YouTube blocks a download without it, "
+                  "and it asks you after {cap} a day), but can’t guarantee the account won’t be restricted.",
         "note": "This window uses a browser profile of the extension’s own, separate from your usual one. Closing it "
                 "cancels the sign-in.",
         "check": "I understand the risk, and I’m using a separately created secondary account",
@@ -888,7 +936,7 @@ WARNING_PAGE: Dict[str, Dict[str, str]] = {
         "risk": "KAREOKIE 的 YouTube 擴充功能會用你在這裡登入的帳號下載。用帳號下載可能讓 YouTube 限制或停用該帳號；"
                 "如果是你的主要 Google 帳號，同一個帳號裡的 Gmail、相片和雲端硬碟也可能受影響。",
         "use": "請使用另外申請的小帳號。",
-        "limits": "擴充功能會盡量少用這個帳號（只在不登入下載被擋時才用，每天最多 {cap} 次），但無法保證帳號不會被限制。",
+        "limits": "擴充功能會盡量少用這個帳號（只在不登入下載被擋時才用，每天超過 {cap} 次會先問你），但無法保證帳號不會被限制。",
         "note": "這個視窗使用擴充功能專用的瀏覽器設定檔，和你平常用的分開。關閉視窗即取消登入。",
         "check": "我了解風險，我使用的是另外申請的小帳號",
         "continue": "繼續前往登入",
@@ -900,7 +948,7 @@ WARNING_PAGE: Dict[str, Dict[str, str]] = {
                 "同じアカウントの Gmail、フォト、ドライブにも影響する可能性があります。",
         "use": "別に作成したサブアカウントを使ってください。",
         "limits": "拡張機能はこのアカウントの使用を最小限にします（ログインなしのダウンロードがブロックされたときだけ、"
-                  "1 日最大 {cap} 回）が、制限されないことは保証できません。",
+                  "1 日 {cap} 回を超えると確認します）が、制限されないことは保証できません。",
         "note": "このウィンドウは普段とは別の、拡張機能専用のブラウザプロファイルを使っています。閉じるとログインは"
                 "キャンセルされます。",
         "check": "リスクを理解しており、別に作成したサブアカウントを使います",
@@ -912,7 +960,7 @@ WARNING_PAGE: Dict[str, Dict[str, str]] = {
                 "해당 계정을 제한하거나 정지할 수 있습니다. 주 Google 계정이라면 같은 계정의 Gmail, 사진, 드라이브에도 "
                 "영향이 있을 수 있습니다.",
         "use": "별도로 만든 보조 계정을 사용하세요.",
-        "limits": "확장 프로그램은 이 계정 사용을 최소화하지만(로그인 없이 다운로드가 차단될 때만, 하루 최대 {cap}회) "
+        "limits": "확장 프로그램은 이 계정 사용을 최소화하지만(로그인 없이 다운로드가 차단될 때만, 하루 {cap}회가 넘으면 확인) "
                   "계정이 제한되지 않는다고 보장할 수는 없습니다.",
         "note": "이 창은 평소 프로필과 분리된 확장 프로그램 전용 브라우저 프로필을 사용합니다. 창을 닫으면 로그인이 "
                 "취소됩니다.",
@@ -1066,15 +1114,13 @@ def _cdp(ws_url: str, method: str, params: Optional[Dict[str, Any]] = None) -> D
         ws.close()
 
 
-def _warning_html(lang: str) -> str:
-    import html
-
-    t = {k: html.escape(v.format(cap=ACCOUNT_DAILY_CAP)) for k, v in WARNING_PAGE[lang].items()}
+def _page_html(lang: str, title: str, body: str, color: str, script: str = "") -> str:
+    """A full-window page of the sign-in window (the text in `body` is escaped by the caller)."""
     return f"""<!doctype html>
-<html lang="{lang}"><head><meta charset="utf-8"><title>{t["heading"]}</title>
+<html lang="{lang}"><head><meta charset="utf-8"><title>{title}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-html, body {{ margin: 0; min-height: 100%; background: #b00020; color: #fff; }}
+html, body {{ margin: 0; min-height: 100%; background: {color}; color: #fff; }}
 body {{ font: 18px/1.6 system-ui, "Segoe UI", "Microsoft JhengHei", "Yu Gothic UI", "Malgun Gothic", sans-serif;
        display: flex; align-items: center; justify-content: center; min-height: 100vh; }}
 main {{ max-width: 760px; padding: 48px 32px; }}
@@ -1086,66 +1132,101 @@ p {{ margin: 0 0 16px; }}
 label {{ display: flex; gap: 12px; align-items: flex-start; margin: 28px 0; padding: 16px; font-weight: 700;
         background: rgba(0,0,0,.25); border: 2px solid #fff; border-radius: 8px; cursor: pointer; }}
 input[type=checkbox] {{ width: 24px; height: 24px; flex: none; margin-top: 3px; }}
+.buttons {{ display: flex; flex-wrap: wrap; gap: 16px; margin-top: 28px; }}
 button {{ font: inherit; font-weight: 700; padding: 14px 28px; border: 0; border-radius: 8px;
-         background: #fff; color: #b00020; cursor: pointer; }}
+         background: #fff; color: {color}; cursor: pointer; }}
+button.secondary {{ background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.7); }}
 button:disabled {{ background: rgba(255,255,255,.35); color: rgba(255,255,255,.8); cursor: not-allowed; }}
 </style></head>
 <body><main>
 <div class="icon" aria-hidden="true">&#9888;</div>
-<h1>{t["heading"]}</h1>
-<p>{t["risk"]}</p>
-<p class="use">{t["use"]}</p>
-<p>{t["limits"]}</p>
-<p class="note">{t["note"]}</p>
-<form method="post" action="accept">
-<label><input type="checkbox" id="understood" name="understood" value="yes" required> {t["check"]}</label>
-<button type="submit" id="continue">{t["continue"]}</button>
-</form>
-</main>
-<script>
-const box = document.getElementById("understood"), button = document.getElementById("continue");
-button.disabled = !box.checked;
-box.addEventListener("change", () => {{ button.disabled = !box.checked; }});
-</script>
+{body}
+</main>{script}
 </body></html>
 """
 
 
-class _Warning:
-    """The warning page of the sign-in window, on 127.0.0.1 under a random path. Accepting it (the checkbox, checked
-    here too) redirects to YouTube's sign-in page and sets `accepted`."""
+def _warning_html(lang: str) -> str:
+    import html
 
-    def __init__(self, lang: str) -> None:
+    t = {k: html.escape(v.format(cap=ACCOUNT_DAILY_CAP)) for k, v in WARNING_PAGE[lang].items()}
+    return _page_html(lang, t["heading"], f"""<h1>{t["heading"]}</h1>
+<p>{t["risk"]}</p>
+<p class="use">{t["use"]}</p>
+<p>{t["limits"]}</p>
+<p class="note">{t["note"]}</p>
+<form method="post" action="choose">
+<label><input type="checkbox" id="understood" name="understood" value="yes" required> {t["check"]}</label>
+<button type="submit" id="continue" name="choice" value="continue">{t["continue"]}</button>
+</form>""", "#b00020", """
+<script>
+const box = document.getElementById("understood"), button = document.getElementById("continue");
+button.disabled = !box.checked;
+box.addEventListener("change", () => { button.disabled = !box.checked; });
+</script>""")
+
+
+def _cap_html(lang: str) -> str:
+    import html
+
+    t = {k: html.escape(v.format(cap=ACCOUNT_DAILY_CAP)) for k, v in CAP_PAGE[lang].items()}
+    return _page_html(lang, t["heading"], f"""<h1>{t["heading"]}</h1>
+<p class="use">{t["recommend"]}</p>
+<p>{t["risk"]}</p>
+<p class="note">{t["note"]}</p>
+<form method="post" action="choose" class="buttons">
+<button type="submit" id="stop" name="choice" value="stop" autofocus>{t["stop"]}</button>
+<button type="submit" id="continue" name="choice" value="continue" class="secondary">{t["continue"]}</button>
+</form>""", "#a34700")
+
+
+class _LocalPage:
+    """A page of the sign-in window on 127.0.0.1 under a random path, and what the user chose on it: `then` maps
+    each choice to where the window goes next ("done": a blank page; the extension closes the window). The choice
+    "continue" also needs the form field `require` (a checkbox), checked here too."""
+
+    def __init__(self, page: str, then: Dict[str, str], require: str = "") -> None:
         import http.server
         import secrets
         import threading
+        import urllib.parse
 
         token = secrets.token_urlsafe(16)
-        page = _warning_html(lang).encode("utf-8")
-        self.accepted = threading.Event()
-        accepted = self.accepted
+        body = page.encode("utf-8")
+        self.choice: Optional[str] = None
+        self.chosen = threading.Event()
+        me = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
-            def _send(self, status: int, body: bytes = b"", headers: Optional[Dict[str, str]] = None) -> None:
+            def _send(self, status: int, data: bytes = b"", headers: Optional[Dict[str, str]] = None) -> None:
                 self.send_response(status)
                 for k, v in {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store",
-                             "Content-Length": str(len(body)), **(headers or {})}.items():
+                             "Content-Length": str(len(data)), **(headers or {})}.items():
                     self.send_header(k, v)
                 self.end_headers()
-                self.wfile.write(body)
+                self.wfile.write(data)
 
             def do_GET(self) -> None:  # noqa: N802
-                self._send(200, page) if self.path == f"/{token}/" else self._send(404)
+                if self.path == f"/{token}/":
+                    self._send(200, body)
+                elif self.path == f"/{token}/done":
+                    self._send(200, b"<!doctype html><title>KAREOKIE</title>")
+                else:
+                    self._send(404)
 
             def do_POST(self) -> None:  # noqa: N802
-                body = self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 4096)).decode("latin-1")
-                if self.path != f"/{token}/accept":
+                fields = urllib.parse.parse_qs(self.rfile.read(min(int(self.headers.get("Content-Length") or 0),
+                                                                   4096)).decode("latin-1"))
+                choice = (fields.get("choice") or [""])[0]
+                if self.path != f"/{token}/choose":
                     self._send(404)
-                elif "understood=yes" not in body.split("&"):
-                    self._send(303, headers={"Location": f"/{token}/"})  # the box wasn't ticked: the page again
+                elif choice not in then or (choice == "continue" and require and fields.get(require) != ["yes"]):
+                    self._send(303, headers={"Location": f"/{token}/"})  # nothing chosen (box not ticked): again
                 else:
-                    accepted.set()
-                    self._send(303, headers={"Location": SIGNIN_URL})
+                    me.choice = choice
+                    me.chosen.set()
+                    nxt = then[choice]
+                    self._send(303, headers={"Location": f"/{token}/done" if nxt == "done" else nxt})
 
             def log_message(self, *args: Any) -> None:
                 pass
@@ -1154,9 +1235,18 @@ class _Warning:
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}/{token}/"
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
+    @property
+    def accepted(self) -> bool:
+        return self.choice == "continue"
+
     def close(self) -> None:
         self.server.shutdown()
         self.server.server_close()
+
+
+def _Warning(lang: str) -> _LocalPage:  # noqa: N802
+    """The warning shown before every sign-in: continuing (with the box ticked) goes on to YouTube's sign-in page."""
+    return _LocalPage(_warning_html(lang), {"continue": SIGNIN_URL}, require="understood")
 
 
 def _launch_browser(exe: str, profile: str, url: str) -> Any:
@@ -1250,7 +1340,7 @@ def ensure_signin(progress: Optional[Callable[..., None]] = None,
             if proc.poll() is not None:
                 raise SignInClosed()
             cookies: List[Dict[str, Any]] = []
-            if warning.accepted.is_set():  # nothing is read before the user accepted the warning
+            if warning.accepted:  # nothing is read before the user accepted the warning
                 try:
                     cookies = _cdp(ws_url, "Storage.getCookies").get("cookies") or []
                 except (OSError, ConnectionError):
@@ -1281,16 +1371,59 @@ def ensure_signin(progress: Optional[Callable[..., None]] = None,
         raise readable_error("signin-failed", exc, browser=name) from exc
     finally:
         warning.close()
-        if proc is not None and proc.poll() is None:
-            try:
-                if ws_url:
-                    _cdp(ws_url, "Browser.close")
-            except Exception:  # noqa: BLE001 - it may close before it answers
-                pass
-            try:
-                proc.wait(timeout=10)
-            except Exception:  # noqa: BLE001 - the window didn't close by itself
-                proc.terminate()
+        _close_browser(proc, ws_url)
+
+
+def _close_browser(proc: Any, ws_url: str) -> None:
+    if proc is not None and proc.poll() is None:
+        try:
+            if ws_url:
+                _cdp(ws_url, "Browser.close")
+        except Exception:  # noqa: BLE001 - it may close before it answers
+            pass
+        try:
+            proc.wait(timeout=10)
+        except Exception:  # noqa: BLE001 - the window didn't close by itself
+            proc.terminate()
+
+
+def _ask_over_cap(progress: Optional[Callable[..., None]], cancel: Optional[Callable[[], None]]) -> bool:
+    """Today's ACCOUNT_DAILY_CAP is reached: ask in the sign-in window whether to stop (recommended) or go on.
+    True: go on. Closing the window or waiting it out means stop."""
+    found = _chromium()
+    folder = _signin_dir()
+    if not found or not folder:
+        return False
+    name, exe = found
+    lang = _lang()
+    page = _LocalPage(_cap_html(lang), {"continue": "done", "stop": "done"})
+    proc: Any = None
+    ws_url = ""
+    try:
+        proc = _launch_browser(exe, os.path.join(folder, "profile"), page.url)
+        ws_url = _devtools_url(os.path.join(folder, "profile"), proc, cancel)
+        note = _text("account-ask", cap=ACCOUNT_DAILY_CAP, browser=name)
+        start = last_note = time.monotonic()
+        if progress is not None:
+            progress(None, note)
+        while not page.chosen.is_set():
+            if cancel is not None:
+                cancel()
+            if proc.poll() is not None or time.monotonic() - start > SIGNIN_TIMEOUT_SEC:
+                return False
+            if progress is not None and time.monotonic() - last_note > SIGNIN_PROGRESS_EVERY_SEC:
+                progress(None, note)
+                last_note = time.monotonic()
+            _wait(0.5, cancel)
+        print(f"[account] today's cap: the user chose {page.choice}")
+        return page.accepted
+    except SignInClosed:
+        return False
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise readable_error("signin-failed", exc, browser=name) from exc
+    finally:
+        page.close()
+        _close_browser(proc, ws_url)
 
 
 def _cookie_work_copy() -> str:
@@ -1499,7 +1632,8 @@ def _video_key(url: str) -> str:
 # - Anonymous first: searches, metadata, music videos and imports go without it. Only an import YouTube's bot check
 #   blocked without it is tried with it, right away instead of the anonymous 5 / 15 / 30 s waits.
 # - With the account: at most one retry, a pause between requests, one call at a time (a lock across processes).
-# - At most ACCOUNT_DAILY_CAP imports a day with it.
+# - ACCOUNT_DAILY_CAP imports a day with it. Past that, the sign-in window asks: stop for today (recommended) or go
+#   on; going on holds until local midnight. Closing the window means stop.
 # - Warning signs stop it for ACCOUNT_PAUSE_SEC: still blocked while signed in, or account trouble (unusual traffic,
 #   too many requests, a suspended or terminated account). The user is told to check the account, not to retry.
 #   A sign-in yt-dlp reports as no longer valid isn't a warning sign: the next blocked import opens the window again.
@@ -1600,10 +1734,8 @@ def _with_account(call_with: Callable[[bool, Any], Any], progress: Optional[Call
     """An import the bot check blocked without the sign-in, tried with it within the limits above."""
     cause = blocked.__cause__ or blocked
     paused = _account_paused_until()
-    if paused:
+    if paused:  # warning signs: no way around this one
         raise readable_error("account-paused", cause, extra={"until": _until_text(paused)}) from cause
-    if _account_uses_today() >= ACCOUNT_DAILY_CAP:
-        raise readable_error("account-cap", cause, extra={"cap": ACCOUNT_DAILY_CAP}) from cause
     folder = _account_dir()
     os.makedirs(folder, exist_ok=True)
     end = last_note = time.monotonic()
@@ -1618,6 +1750,10 @@ def _with_account(call_with: Callable[[bool, Any], Any], progress: Optional[Call
         _wait(1, cancel)
         lock = _take_lock(folder)
     try:
+        if _account_uses_today() >= ACCOUNT_DAILY_CAP and _account_state().get("overCap") != _today():
+            if not _ask_over_cap(progress, cancel):
+                raise readable_error("account-cap", cause, extra={"cap": ACCOUNT_DAILY_CAP}) from cause
+            _save_account_state(dict(_account_state(), overCap=_today()))  # until local midnight
         ensure_signin(progress, cancel)  # the sign-in window, when there's no working sign-in yet
         _count_account_use()
         if progress is not None:

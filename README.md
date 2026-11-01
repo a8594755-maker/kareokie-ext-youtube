@@ -83,8 +83,10 @@ and they can't guarantee the account won't be restricted.
   YouTube's bot check blocked without it is tried with it. The anonymous 5 / 15 / 30 s waits are skipped then.
 - **Gently.** With the account: at most one retry (after 10 s), 1.5 s between requests (yt-dlp's
   `sleep_interval_requests`), and one call at a time (a lock in `<dataDir>/account/`).
-- **A daily cap.** At most 30 imports a day with the account (`ACCOUNT_DAILY_CAP`). Past it, the import says
-  today's limit is reached: try tomorrow or another network.
+- **A daily cap that asks.** After 30 imports a day with the account (`ACCOUNT_DAILY_CAP`), the next one opens the
+  sign-in window on a local page: "Stop for today (recommended)" or "I understand the risk, continue anyway".
+  Closing the window means stop, and the import says today's limit is reached, with stopping recommended.
+  Continuing lifts the cap until local midnight only. It never lifts the 24-hour pause below.
 - **Stop at warning signs.** If a signed-in call is still blocked, or YouTube reports account trouble (unusual
   traffic, HTTP 429 / too many requests, a suspended or terminated account), the account isn't used for 24 hours.
   The user is told to check it in a browser and not to keep retrying. A sign-in that yt-dlp reports as no longer

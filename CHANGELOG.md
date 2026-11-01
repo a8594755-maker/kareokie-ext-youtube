@@ -28,7 +28,9 @@
   browser setting wins over it. The bot-check error points to it when Chrome or Edge is installed.
 - The account is used as little and as gently as possible: searches, metadata, music videos and imports go
   without it, and only an import the bot check blocked without it is tried with it (at most one retry, 1.5 s
-  between requests, one at a time). At most 30 imports a day go through it. If it is still blocked while signed
+  between requests, one at a time). After 30 imports a day with it, the sign-in window asks: stop for today
+  (recommended) or "I understand the risk, continue anyway", which holds until local midnight; closing the window
+  stops. If it is still blocked while signed
   in, or YouTube reports account trouble (unusual traffic, too many requests, a suspended account), it isn't used
   for 24 hours and the user is told to check the account and not to keep retrying. The warning page says use is
   kept to a minimum but restriction can't be ruled out.

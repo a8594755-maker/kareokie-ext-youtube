@@ -48,11 +48,12 @@ def request(url, method="GET", body=None):
 
 
 class FakeBrowser:
-    """subprocess.Popen of the sign-in window: the user accepts the warning at poll `accepts_at` (None: never) and
-    closes the window after `closes_after` polls (None: never)."""
+    """subprocess.Popen of the sign-in window: the user picks `choice` on its page at poll `accepts_at` (None: never;
+    on the warning, with the box ticked) and closes the window after `closes_after` polls (None: never)."""
 
-    def __init__(self, accepts_at=1, closes_after=None):
+    def __init__(self, accepts_at=1, closes_after=None, choice="continue"):
         self.accepts_at = accepts_at
+        self.choice = choice
         self.closes_after = closes_after
         self.polls = 0
         self.closed = False
@@ -64,8 +65,9 @@ class FakeBrowser:
         if self.polls == self.accepts_at and self.url:
             status, _, self.page = request(self.url)
             assert status == 200
-            status, headers, _ = request(self.url + "accept", "POST", "understood=yes")
-            assert status == 303 and headers["Location"] == main.SIGNIN_URL, (status, headers)
+            status, headers, _ = request(self.url + "choose", "POST", f"choice={self.choice}&understood=yes")
+            assert status == 303, (status, headers)
+            self.went_to = headers["Location"]
         if self.closes_after is not None and self.polls > self.closes_after:
             self.closed = True
         return 0 if self.closed else None
@@ -167,13 +169,16 @@ class SignInTest(SignInBase):
     def test_the_warning_cant_be_skipped(self):
         warning = main._Warning("en")
         try:
-            status, headers, _ = request(warning.url + "accept", "POST", "")  # the box not ticked
-            self.assertEqual((status, headers["Location"]), (303, urllib.parse.urlsplit(warning.url).path))
-            self.assertEqual(request(warning.url.replace(warning.url.split("/")[3], "guess") + "accept", "POST",
-                                     "understood=yes")[0], 404)
-            self.assertFalse(warning.accepted.is_set())
-            self.assertEqual(request(warning.url + "accept", "POST", "understood=yes")[0], 303)
-            self.assertTrue(warning.accepted.is_set())
+            page = urllib.parse.urlsplit(warning.url).path
+            for body in ("", "choice=continue", "understood=yes", "choice=stop&understood=yes"):
+                status, headers, _ = request(warning.url + "choose", "POST", body)  # the box not ticked, or no choice
+                self.assertEqual((status, headers["Location"]), (303, page), body)
+            self.assertEqual(request(warning.url.replace(warning.url.split("/")[3], "guess") + "choose", "POST",
+                                     "choice=continue&understood=yes")[0], 404)
+            self.assertFalse(warning.accepted)
+            status, headers, _ = request(warning.url + "choose", "POST", "choice=continue&understood=yes")
+            self.assertEqual((status, headers["Location"]), (303, main.SIGNIN_URL))
+            self.assertTrue(warning.accepted)
         finally:
             warning.close()
 
@@ -384,20 +389,70 @@ class AccountTest(SignInBase):
         self.assertEqual(self.browser.page.count("<h1>"), 1)
         self.assertFalse(os.path.exists(main._refresh_marker()))
 
-    def test_daily_cap(self):
-        main._save_account_state({"day": main._today(), "count": main.ACCOUNT_DAILY_CAP - 1})
-        self.assertEqual(self.download(), {"ok": True})
-        self.calls.clear()
+    def at_cap(self, choice="stop", **browser):
+        """Signed in already, today's cap reached; the next window is the cap question."""
+        self.sign_in()
+        main._save_account_state({"day": main._today(), "count": main.ACCOUNT_DAILY_CAP})
+        self.browser = FakeBrowser(choice=choice, **browser)
+
+    def test_daily_cap_asks_and_stopping_is_the_default(self):
         self.settings({"signIn": True}, locale="zh-TW")
+        self.at_cap("stop")
+        messages = []
+        with self.assertRaises(main.YouTubeError) as err:
+            self.download(lambda p, m: messages.append(m))
+        self.assertEqual(self.calls, [False])  # the account wasn't used
+        self.assertEqual(type(err.exception).__name__, f"今天用帳號下載已達 {main.ACCOUNT_DAILY_CAP} 首")
+        self.assertIn("建議今天先停，以免帳號被限制。如果仍要繼續", str(err.exception))
+        self.assertIn("請在跳出的 Chrome 視窗選擇今天先停或繼續", messages[0])
+        page = self.browser.page
+        self.assertIn(f"<h1>今天用帳號下載已達 {main.ACCOUNT_DAILY_CAP} 首</h1>", page)
+        self.assertIn('value="stop" autofocus>今天先停（建議）', page)
+        self.assertIn('value="continue" class="secondary">我了解風險，仍要繼續', page)
+        self.assertTrue(self.browser.closed)
+        self.assertNotEqual(main._account_state().get("overCap"), main._today())
+
+    def test_daily_cap_closing_the_window_stops(self):
+        self.at_cap(accepts_at=None, closes_after=2)
         with self.assertRaises(main.YouTubeError) as err:
             self.download()
+        self.assertEqual(err.exception.kind, "account-cap")
         self.assertEqual(self.calls, [False])
-        self.assertEqual(type(err.exception).__name__, "今天用帳號下載的次數已達上限")
-        self.assertIn("明天再試或換網路", str(err.exception))
-        # a new day
-        main._save_account_state({"day": "2000-01-01", "count": 99})
+
+    def test_daily_cap_continue_holds_until_midnight(self):
+        self.at_cap("continue")
+        self.assertEqual(self.download(), {"ok": True})
+        self.assertEqual(self.calls, [False, True])
+        self.assertEqual(self.browser.went_to.rsplit("/", 1)[1], "done")
+        self.assertEqual(main._account_state()["overCap"], main._today())
+        # the rest of today: not asked again
+        self.browser = FakeBrowser(choice="stop")
         self.calls.clear()
         self.assertEqual(self.download(), {"ok": True})
+        self.assertIsNone(self.browser.url)
+        # a new day starts over: count 0, and the next cap asks again
+        main._save_account_state(dict(main._account_state(), day="2000-01-01"))
+        self.assertEqual(main._account_uses_today(), 0)
+        main._save_account_state({"day": main._today(), "count": main.ACCOUNT_DAILY_CAP, "overCap": "2000-01-01"})
+        with self.assertRaises(main.YouTubeError):
+            self.download()
+        self.assertIsNotNone(self.browser.url)
+
+    def test_continuing_past_the_cap_doesnt_lift_the_pause(self):
+        self.at_cap("continue")
+        main._save_account_state(dict(main._account_state(), overCap=main._today()))
+        main._pause_account("test")
+        with self.assertRaises(main.YouTubeError) as err:
+            self.download()
+        self.assertEqual(err.exception.kind, "account-paused")
+        self.assertEqual(self.calls, [False])
+        self.assertIsNone(self.browser.url)
+
+    def test_under_the_cap_nothing_is_asked(self):
+        self.sign_in()
+        self.browser = FakeBrowser(choice="stop")
+        self.assertEqual(self.download(), {"ok": True})
+        self.assertIsNone(self.browser.url)
 
     def test_one_call_with_the_account_at_a_time(self):
         os.makedirs(main._account_dir(), exist_ok=True)
@@ -439,7 +494,7 @@ class AccountTest(SignInBase):
 
     def test_warning_page_says_use_is_limited_but_not_guaranteed(self):
         self.download()
-        self.assertIn(f"at most {main.ACCOUNT_DAILY_CAP} a day", self.browser.page)
+        self.assertIn(f"it asks you after {main.ACCOUNT_DAILY_CAP} a day", self.browser.page)
         self.assertIn("can’t guarantee", self.browser.page)
         self.assertIn("無法保證帳號不會被限制", main._warning_html("zh-TW"))
 
