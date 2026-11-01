@@ -66,6 +66,18 @@
       }
     },
     {
+      "key": "signIn",
+      "type": "boolean",
+      "default": false,
+      "label": "Sign in to YouTube in a separate window (Chrome / Edge). Never your main account",
+      "description": "Don’t sign in with your main account: downloading with an account may make YouTube restrict or disable it. Use a separately created secondary account. For networks YouTube keeps blocking with “confirm you’re not a bot”: the next import opens Chrome (or Edge) with a profile of its own, separate from your usual one, shows this warning, then YouTube’s sign-in page. You sign in there yourself; the extension keeps that sign-in and downloads as that account. Turning this off signs out and deletes that profile.",
+      "i18n": {
+        "zh-TW": {"label": "在獨立視窗登入 YouTube（Chrome / Edge）：請勿用主帳號", "description": "請勿登入主帳號：用帳號下載可能讓 YouTube 限制或停用該帳號，請使用另外申請的小帳號。給 YouTube 一直要求確認不是機器人的網路使用：下次匯入時會用獨立的設定檔開啟 Chrome（或 Edge），和你平常用的分開，先顯示這個警告，再打開 YouTube 登入頁。請自己在裡面登入，擴充功能會保存登入狀態並以這個帳號下載。關閉這個選項即會登出並刪除該設定檔。"},
+        "ja": {"label": "別ウィンドウで YouTube にログイン（Chrome / Edge）：メインのアカウントは使わない", "description": "メインのアカウントでログインしないでください。アカウントでダウンロードすると、YouTube がそのアカウントを制限または停止することがあります。別に作成したサブアカウントを使ってください。YouTube がボットではないことの確認を何度も求めるネットワーク向けです。次の取り込みで、普段とは別の専用プロファイルで Chrome（または Edge）が開き、この警告のあとに YouTube のログインページを表示します。そこでご自身でログインすると、拡張機能はそのログインを保存し、そのアカウントでダウンロードします。オフにするとログアウトし、そのプロファイルを削除します。"},
+        "ko": {"label": "별도 창에서 YouTube 로그인(Chrome / Edge): 주 계정 사용 금지", "description": "주 계정으로 로그인하지 마세요. 계정으로 다운로드하면 YouTube가 해당 계정을 제한하거나 정지할 수 있습니다. 별도로 만든 보조 계정을 사용하세요. YouTube가 로봇이 아닌지 계속 확인을 요청하는 네트워크용입니다. 다음에 가져올 때 평소 프로필과 분리된 전용 프로필로 Chrome(또는 Edge)이 열리고, 이 경고를 보여 준 뒤 YouTube 로그인 페이지를 엽니다. 거기서 직접 로그인하면 확장 프로그램이 로그인 상태를 저장하고 그 계정으로 다운로드합니다. 끄면 로그아웃되고 해당 프로필이 삭제됩니다."}
+      }
+    },
+    {
       "key": "cookiesFromBrowser",
       "type": "select",
       "default": "off",

@@ -44,6 +44,8 @@ def setup(context: Dict[str, Any]) -> None:
     _context.update(context or {})
     _settings.clear()
     _settings.update(context.get("settings") or {})
+    if not _settings.get("signIn"):
+        sign_out()  # the setting was turned off: delete the sign-in window's profile and cookies
 
 
 # ---------------------------------------------------------------------------
@@ -468,6 +470,59 @@ MESSAGES: Dict[str, Dict[str, Tuple[str, str]]] = {
                "이 확장 프로그램 설정의 경로를 확인하세요. YouTube에 로그인된 브라우저에서 내보낸 cookies.txt"
                "(Netscape 형식)여야 합니다. 또는 설정을 비우세요."),
     },
+    "signin-browser": {
+        "en": ("Couldn’t find Chrome or Edge to sign in to YouTube",
+               "“Sign in to YouTube in a separate window” needs Google Chrome or Microsoft Edge. Install one, or turn "
+               "that setting off in this extension’s settings and use Firefox or a cookies.txt instead."),
+        "zh-TW": ("找不到可以登入 YouTube 的 Chrome 或 Edge",
+                  "「在獨立視窗登入 YouTube」需要 Google Chrome 或 Microsoft Edge。請安裝其中一個，"
+                  "或到擴充功能設定關閉這個選項，改用 Firefox 或 cookies.txt。"),
+        "ja": ("YouTube にログインするための Chrome や Edge が見つかりません",
+               "「別ウィンドウで YouTube にログイン」には Google Chrome か Microsoft Edge が必要です。どちらかをインストールするか、"
+               "拡張機能の設定でこの項目をオフにして、Firefox か cookies.txt を使ってください。"),
+        "ko": ("YouTube에 로그인할 Chrome 또는 Edge를 찾지 못했습니다",
+               "“별도 창에서 YouTube 로그인”에는 Google Chrome 또는 Microsoft Edge가 필요합니다. 둘 중 하나를 설치하거나, "
+               "이 확장 프로그램 설정에서 이 항목을 끄고 Firefox나 cookies.txt를 사용하세요."),
+    },
+    "signin-closed": {
+        "en": ("YouTube sign-in was cancelled",
+               "The sign-in window was closed before you signed in to YouTube. Import again to open it again, or turn "
+               "off “Sign in to YouTube in a separate window” in this extension’s settings."),
+        "zh-TW": ("YouTube 登入已取消",
+                  "登入視窗在登入 YouTube 之前就被關閉了。再匯入一次會重新開啟登入視窗，"
+                  "或到擴充功能設定關閉「在獨立視窗登入 YouTube」。"),
+        "ja": ("YouTube へのログインがキャンセルされました",
+               "YouTube にログインする前にログインウィンドウが閉じられました。もう一度取り込むとログインウィンドウが開きます。"
+               "または拡張機能の設定で「別ウィンドウで YouTube にログイン」をオフにしてください。"),
+        "ko": ("YouTube 로그인이 취소되었습니다",
+               "YouTube에 로그인하기 전에 로그인 창이 닫혔습니다. 다시 가져오면 로그인 창이 다시 열립니다. "
+               "또는 이 확장 프로그램 설정에서 “별도 창에서 YouTube 로그인”을 끄세요."),
+    },
+    "signin-timeout": {
+        "en": ("YouTube sign-in took too long",
+               "Nobody signed in to YouTube in the sign-in window within 15 minutes, so it was closed. Import again "
+               "to open it again."),
+        "zh-TW": ("YouTube 登入等太久了",
+                  "15 分鐘內沒有在登入視窗登入 YouTube，所以視窗已關閉。再匯入一次會重新開啟。"),
+        "ja": ("YouTube へのログインに時間がかかりすぎました",
+               "15 分以内にログインウィンドウで YouTube にログインされなかったため、ウィンドウを閉じました。"
+               "もう一度取り込むと再び開きます。"),
+        "ko": ("YouTube 로그인 대기 시간이 초과되었습니다",
+               "15분 안에 로그인 창에서 YouTube에 로그인하지 않아 창을 닫았습니다. 다시 가져오면 다시 열립니다."),
+    },
+    "signin-failed": {
+        "en": ("Couldn’t open the YouTube sign-in window",
+               "{browser} didn’t start for signing in. Retry the import, or turn off “Sign in to YouTube in a "
+               "separate window” in this extension’s settings."),
+        "zh-TW": ("無法開啟 YouTube 登入視窗",
+                  "{browser} 沒有成功啟動來登入。請再匯入一次，或到擴充功能設定關閉「在獨立視窗登入 YouTube」。"),
+        "ja": ("YouTube のログインウィンドウを開けませんでした",
+               "ログイン用に {browser} を起動できませんでした。もう一度取り込むか、拡張機能の設定で"
+               "「別ウィンドウで YouTube にログイン」をオフにしてください。"),
+        "ko": ("YouTube 로그인 창을 열지 못했습니다",
+               "로그인을 위해 {browser} 브라우저를 시작하지 못했습니다. 다시 가져오거나, 이 확장 프로그램 설정에서 "
+               "“별도 창에서 YouTube 로그인”을 끄세요."),
+    },
     "changed": {
         "en": ("YouTube changed something yt-dlp can’t handle yet",
                "yt-dlp {version} couldn’t download this video. The extension updates yt-dlp by itself as soon as a "
@@ -486,6 +541,33 @@ MESSAGES: Dict[str, Dict[str, Tuple[str, str]]] = {
 # What works against a bot check that doesn't pass, on this computer: the user's own YouTube sign-in (Firefox, or a
 # cookies.txt on Windows, where yt-dlp can't read Chrome's and Edge's encrypted cookies), another network, or time.
 BLOCKED_HINTS: Dict[str, Dict[str, str]] = {
+    "signin": {
+        "en": "Turn on “Sign in to YouTube in a separate window” in this extension’s settings: the next import opens "
+              "{chromium} with a profile of its own, separate from your usual one, where you sign in to YouTube "
+              "yourself. {main}",
+        "zh-TW": "到擴充功能設定開啟「在獨立視窗登入 YouTube」：下次匯入時會用獨立的設定檔開啟 {chromium}（和你平常用的分開），"
+                 "請自己在裡面登入 YouTube。{main}",
+        "ja": "拡張機能の設定で「別ウィンドウで YouTube にログイン」をオンにしてください。次の取り込みで、普段とは別の"
+              "専用プロファイルで {chromium} が開くので、そこでご自身で YouTube にログインします。{main}",
+        "ko": "이 확장 프로그램 설정에서 “별도 창에서 YouTube 로그인”을 켜세요. 다음에 가져올 때 평소 프로필과 분리된 전용 "
+              "프로필로 {chromium} 브라우저가 열리며, 거기서 직접 YouTube에 로그인하면 됩니다. {main}",
+    },
+    "signin-expired": {
+        "en": "This used the YouTube sign-in from the extension’s sign-in window, and YouTube didn’t accept it: it may "
+              "have expired, or YouTube may be restricting that account. The next import opens the sign-in window "
+              "again; check you’re signed in there, or sign in with another secondary account. Turning “Sign in to "
+              "YouTube in a separate window” off signs out.",
+        "zh-TW": "這次用的是擴充功能登入視窗裡的 YouTube 登入狀態，但 YouTube 不接受：可能已經過期，或 YouTube 正在限制這個帳號。"
+                 "下次匯入會再開啟登入視窗，請確認裡面仍是登入狀態，或改用另一個次要帳號登入。"
+                 "關閉「在獨立視窗登入 YouTube」即可登出。",
+        "ja": "拡張機能のログインウィンドウでの YouTube ログインを使いましたが、YouTube に受け付けられませんでした。"
+              "期限切れか、YouTube がそのアカウントを制限している可能性があります。次の取り込みでログインウィンドウが"
+              "再び開くので、ログインしたままか確認するか、別のサブアカウントでログインしてください。"
+              "「別ウィンドウで YouTube にログイン」をオフにするとログアウトします。",
+        "ko": "이번에는 확장 프로그램 로그인 창의 YouTube 로그인을 사용했지만 YouTube에서 받아들이지 않았습니다. 만료되었거나 "
+              "YouTube가 해당 계정을 제한하고 있을 수 있습니다. 다음에 가져올 때 로그인 창이 다시 열리니, 로그인 상태인지 "
+              "확인하거나 다른 보조 계정으로 로그인하세요. “별도 창에서 YouTube 로그인”을 끄면 로그아웃됩니다.",
+    },
     "firefox": {
         "en": "Firefox is installed: sign in to YouTube in Firefox, then in this extension’s settings set “Use my "
               "YouTube sign-in from a browser” to Firefox and retry.",
@@ -554,6 +636,13 @@ BLOCKED_HINTS: Dict[str, Dict[str, str]] = {
 
 # progress messages, shown by the app while an import runs
 PROGRESS: Dict[str, Dict[str, str]] = {
+    "signin-wait": {
+        "en": "{main} Read the warning in the {browser} window that opened, then sign in to YouTube there. Waiting…",
+        "zh-TW": "{main}請先看完剛開啟的 {browser} 視窗裡的警告，再在裡面登入 YouTube。等待登入中…",
+        "ja": "{main}開いた {browser} のウィンドウの警告を読んでから、そこで YouTube にログインしてください。"
+              "ログインを待っています…",
+        "ko": "{main} 열린 {browser} 창의 경고를 읽은 뒤 거기서 YouTube에 로그인하세요. 로그인을 기다리는 중…",
+    },
     "retry": {
         "en": "YouTube asked to confirm this isn’t a bot; trying again in {delay} s ({attempt}/{total})…",
         "zh-TW": "YouTube 要求確認不是機器人，{delay} 秒後重試（{attempt}/{total}）…",
@@ -643,18 +732,18 @@ def _firefox_found() -> bool:
     return False
 
 
-def _blocked_hints() -> List[str]:
-    """Which BLOCKED_HINTS apply on this computer, with these settings."""
+def _blocked_hints(signed_in: bool = False) -> List[str]:
+    """Which BLOCKED_HINTS apply on this computer, with these settings (`signed_in`: the sign-in window's)."""
     if _settings.get("cookiesFromBrowser") in BROWSERS:
         hints = ["signed-in-browser"]
     elif str(_settings.get("cookiesFile") or "").strip():
         hints = ["signed-in-file"]
-    elif _firefox_found():
-        hints = ["firefox"]
-    elif sys.platform == "win32":
-        hints = ["cookies-txt"]
+    elif signed_in:
+        hints = ["signin-expired"]
     else:
-        hints = ["browser"]  # macOS and Linux read Chrome, Edge and Brave too
+        hints = (["signin"] if _chromium() else []) + (["firefox"] if _firefox_found() else [])
+        if not hints:
+            hints = ["cookies-txt"] if sys.platform == "win32" else ["browser"]  # macOS / Linux read Chrome too
     return hints + ["network"]
 
 
@@ -666,8 +755,9 @@ def error_kind(exc: BaseException) -> Optional[str]:
     return None
 
 
-def readable_error(kind: str, exc: BaseException, again: bool = False) -> YouTubeError:
-    browser = BROWSERS.get(str(_settings.get("cookiesFromBrowser")))
+def readable_error(kind: str, exc: BaseException, again: bool = False, signed_in: bool = False,
+                   browser: Optional[str] = None) -> YouTubeError:
+    browser = browser or BROWSERS.get(str(_settings.get("cookiesFromBrowser")))
     lang = _lang()
     if kind == "cookies" and not browser:
         kind = "cookiefile"
@@ -676,13 +766,522 @@ def readable_error(kind: str, exc: BaseException, again: bool = False) -> YouTub
     title, body = MESSAGES["blocked-again" if kind == "blocked" and again else kind][lang]
     if kind == "blocked":
         # Chinese and Japanese sentences follow each other without a space
-        body = ("" if lang in ("zh-TW", "ja") else " ").join([body] + [BLOCKED_HINTS[h][lang] for h in _blocked_hints()])
-    fmt = {"browser": browser or "", "version": _active_version() or "?"}
+        body = ("" if lang in ("zh-TW", "ja") else " ").join([body] + [BLOCKED_HINTS[h][lang] for h in _blocked_hints(signed_in)])
+    fmt = {"browser": browser or "", "version": _active_version() or "?",
+           "chromium": (_chromium() or ("Chrome",))[0] if kind == "blocked" else "", "main": MAIN_ACCOUNT[lang]}
     # a subclass named after the title, so the app's "<class>: <message>" reads as a sentence
     cls = type(title.format(**fmt), (YouTubeError,), {})
     err = cls(body.format(**fmt))
     err.__cause__ = exc
     return err
+
+
+# ---------------------------------------------------------------------------
+# Sign-in in a window of its own
+#
+# With the "signIn" setting on, the next import opens Chrome (or Edge) with a profile that belongs to the extension
+# (<dataDir>/signin/profile, never the user's usual profile). It first shows a warning page, served on 127.0.0.1 by
+# the extension, that the user must accept (a checkbox: "I'm using a secondary account, not my main one") before it
+# goes on to YouTube's sign-in page; closing the window cancels. The user signs in there themselves; the extension
+# waits until youtube.com has a signed-in session, asks the browser for its youtube.com / google.com cookies over the
+# DevTools protocol (Chrome allows remote debugging only on a profile like this one), writes them to
+# <dataDir>/signin/cookies.txt and closes the window. Nothing is read before the warning is accepted.
+#
+# yt-dlp then downloads as that account and saves the cookies YouTube refreshes back to the file (through a copy that
+# replaces it in one step), so the sign-in lasts across imports, app restarts and extension updates (the app keeps
+# dataDir). When YouTube stops accepting it, the next import opens the window again (warning first); the kept
+# profile is usually still signed in, so no password is needed. Only turning the setting off (sign-out) deletes
+# the profile and the file. Cookie values are never logged or put in messages.
+# The user's own cookies.txt or browser setting wins over this sign-in.
+# ---------------------------------------------------------------------------
+
+SIGNIN_URL = "https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fwww.youtube.com%2F"
+SIGNIN_TIMEOUT_SEC = 15 * 60
+SIGNIN_POLL_SEC = 2
+SIGNIN_PROGRESS_EVERY_SEC = 20  # the app gives up on a call that stays quiet too long
+SIGNIN_START_SEC = 30
+SIGNIN_COOKIE_DOMAINS = ("youtube.com", "google.com")
+SIGNED_IN_COOKIES = ("SAPISID", "__Secure-3PAPISID", "__Secure-3PSID")
+WORK_COPY_STALE_SEC = 3600  # a yt-dlp call's copy of cookies.txt left by a call that was killed
+
+# shown on the warning page and at the start of the sign-in progress message
+MAIN_ACCOUNT: Dict[str, str] = {
+    "en": "Don’t sign in with your main account: downloading with an account may make YouTube restrict or disable it. "
+          "Use a separately created secondary account.",
+    "zh-TW": "請勿登入主帳號：用帳號下載可能讓 YouTube 限制或停用該帳號，請使用另外申請的小帳號。",
+    "ja": "メインのアカウントでログインしないでください。アカウントでダウンロードすると、YouTube がそのアカウントを制限"
+          "または停止することがあります。別に作成したサブアカウントを使ってください。",
+    "ko": "주 계정으로 로그인하지 마세요. 계정으로 다운로드하면 YouTube가 해당 계정을 제한하거나 정지할 수 있습니다. "
+          "별도로 만든 보조 계정을 사용하세요.",
+}
+
+WARNING_PAGE: Dict[str, Dict[str, str]] = {
+    "en": {
+        "heading": "Don’t sign in with your main account",
+        "risk": "The KAREOKIE YouTube extension downloads as the account you sign in with here. YouTube may restrict "
+                "or disable accounts that download. If it is your main Google account, its Gmail, photos and files "
+                "could be affected too.",
+        "use": "Use a separately created secondary account.",
+        "note": "This window uses a browser profile of the extension’s own, separate from your usual one. Closing it "
+                "cancels the sign-in.",
+        "check": "I understand the risk, and I’m using a separately created secondary account",
+        "continue": "Continue to sign-in",
+    },
+    "zh-TW": {
+        "heading": "請勿登入主帳號",
+        "risk": "KAREOKIE 的 YouTube 擴充功能會用你在這裡登入的帳號下載。用帳號下載可能讓 YouTube 限制或停用該帳號；"
+                "如果是你的主要 Google 帳號，同一個帳號裡的 Gmail、相片和雲端硬碟也可能受影響。",
+        "use": "請使用另外申請的小帳號。",
+        "note": "這個視窗使用擴充功能專用的瀏覽器設定檔，和你平常用的分開。關閉視窗即取消登入。",
+        "check": "我了解風險，我使用的是另外申請的小帳號",
+        "continue": "繼續前往登入",
+    },
+    "ja": {
+        "heading": "メインのアカウントでログインしないでください",
+        "risk": "KAREOKIE の YouTube 拡張機能は、ここでログインしたアカウントでダウンロードします。アカウントでダウンロード"
+                "すると、YouTube がそのアカウントを制限または停止することがあります。メインの Google アカウントだと、"
+                "同じアカウントの Gmail、フォト、ドライブにも影響する可能性があります。",
+        "use": "別に作成したサブアカウントを使ってください。",
+        "note": "このウィンドウは普段とは別の、拡張機能専用のブラウザプロファイルを使っています。閉じるとログインは"
+                "キャンセルされます。",
+        "check": "リスクを理解しており、別に作成したサブアカウントを使います",
+        "continue": "ログインに進む",
+    },
+    "ko": {
+        "heading": "주 계정으로 로그인하지 마세요",
+        "risk": "KAREOKIE의 YouTube 확장 프로그램은 여기서 로그인한 계정으로 다운로드합니다. 계정으로 다운로드하면 YouTube가 "
+                "해당 계정을 제한하거나 정지할 수 있습니다. 주 Google 계정이라면 같은 계정의 Gmail, 사진, 드라이브에도 "
+                "영향이 있을 수 있습니다.",
+        "use": "별도로 만든 보조 계정을 사용하세요.",
+        "note": "이 창은 평소 프로필과 분리된 확장 프로그램 전용 브라우저 프로필을 사용합니다. 창을 닫으면 로그인이 "
+                "취소됩니다.",
+        "check": "위험을 이해했으며, 별도로 만든 보조 계정을 사용합니다",
+        "continue": "로그인 계속",
+    },
+}
+
+
+class SignInClosed(Exception):
+    pass
+
+
+def _signin_dir() -> Optional[str]:
+    data = _context.get("dataDir")
+    return os.path.join(data, "signin") if data else None
+
+
+def _refresh_marker() -> str:
+    """Present when YouTube stopped accepting the sign-in: the next import opens the window again."""
+    return os.path.join(_signin_dir() or "", "refresh")
+
+
+def _signin_cookies() -> Optional[str]:
+    folder = _signin_dir()
+    path = os.path.join(folder, "cookies.txt") if folder else ""
+    return path if path and os.path.isfile(path) else None
+
+
+def _own_cookies_set() -> bool:
+    """The user's own cookies.txt or browser setting, which win over the sign-in window."""
+    return str(_settings.get("cookiesFromBrowser") or "off") in BROWSERS or bool(
+        str(_settings.get("cookiesFile") or "").strip().strip('"'))
+
+
+def _using_signin() -> bool:
+    return bool(_settings.get("signIn")) and not _own_cookies_set() and _signin_cookies() is not None
+
+
+def sign_out() -> None:
+    folder = _signin_dir()
+    if folder and os.path.isdir(folder):
+        shutil.rmtree(folder, ignore_errors=True)
+        print("[sign-in] signed out: deleted the sign-in profile and cookies")
+
+
+def _chromium() -> Optional[Tuple[str, str]]:
+    """(name, executable) of the installed Chrome, else Edge."""
+    if sys.platform == "win32":
+        roots = [os.environ.get(k, "") for k in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA")]
+        candidates = [("Chrome", os.path.join(r, "Google", "Chrome", "Application", "chrome.exe")) for r in roots]
+        candidates += [("Edge", os.path.join(r, "Microsoft", "Edge", "Application", "msedge.exe")) for r in roots]
+    elif sys.platform == "darwin":
+        candidates = [(name, os.path.join(home, f"{app}.app", "Contents", "MacOS", app))
+                      for name, app in (("Chrome", "Google Chrome"), ("Edge", "Microsoft Edge"))
+                      for home in ("/Applications", os.path.expanduser("~/Applications"))]
+    else:
+        candidates = [(name, shutil.which(exe) or "") for name, exe in (
+            ("Chrome", "google-chrome"), ("Chrome", "google-chrome-stable"), ("Chrome", "chromium"),
+            ("Edge", "microsoft-edge"))]
+    return next(((name, exe) for name, exe in candidates if exe and os.path.isfile(exe)), None)
+
+
+class _WebSocket:
+    """The little of RFC 6455 the DevTools protocol on 127.0.0.1 needs (text frames, standard library only)."""
+
+    def __init__(self, url: str, timeout: float = 10) -> None:
+        import base64
+        import socket
+        import urllib.parse
+
+        u = urllib.parse.urlsplit(url)
+        self.sock = socket.create_connection((u.hostname, u.port or 80), timeout=timeout)
+        key = base64.b64encode(os.urandom(16)).decode()
+        self.sock.sendall((f"GET {u.path or '/'} HTTP/1.1\r\nHost: {u.hostname}:{u.port}\r\nUpgrade: websocket\r\n"
+                           f"Connection: Upgrade\r\nSec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n")
+                          .encode())
+        head = b""
+        while b"\r\n\r\n" not in head:
+            chunk = self.sock.recv(1024)
+            if not chunk:
+                raise ConnectionError("the browser closed the DevTools connection")
+            head += chunk
+        if b" 101 " not in head.split(b"\r\n", 1)[0]:
+            raise ConnectionError(head.split(b"\r\n", 1)[0].decode("latin-1"))
+        self.buf = head.split(b"\r\n\r\n", 1)[1]
+
+    def _exact(self, n: int) -> bytes:
+        while len(self.buf) < n:
+            chunk = self.sock.recv(65536)
+            if not chunk:
+                raise ConnectionError("the browser closed the DevTools connection")
+            self.buf += chunk
+        out, self.buf = self.buf[:n], self.buf[n:]
+        return out
+
+    def _frame(self, opcode: int, data: bytes) -> None:
+        n = len(data)
+        head = bytes([0x80 | opcode])
+        if n < 126:
+            head += bytes([0x80 | n])
+        elif n < 1 << 16:
+            head += bytes([0x80 | 126]) + n.to_bytes(2, "big")
+        else:
+            head += bytes([0x80 | 127]) + n.to_bytes(8, "big")
+        mask = os.urandom(4)
+        self.sock.sendall(head + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(data)))
+
+    def send(self, text: str) -> None:
+        self._frame(0x1, text.encode("utf-8"))
+
+    def recv(self) -> str:
+        message = b""
+        while True:
+            b1, b2 = self._exact(2)
+            n = b2 & 0x7F
+            if n == 126:
+                n = int.from_bytes(self._exact(2), "big")
+            elif n == 127:
+                n = int.from_bytes(self._exact(8), "big")
+            mask = self._exact(4) if b2 & 0x80 else b""
+            data = self._exact(n)
+            if mask:
+                data = bytes(b ^ mask[i % 4] for i, b in enumerate(data))
+            opcode = b1 & 0x0F
+            if opcode == 0x8:
+                raise ConnectionError("the browser closed the DevTools connection")
+            if opcode == 0x9:
+                self._frame(0xA, data)
+                continue
+            if opcode in (0x0, 0x1, 0x2):
+                message += data
+                if b1 & 0x80:
+                    return message.decode("utf-8")
+
+    def close(self) -> None:
+        try:
+            self.sock.close()
+        except OSError:
+            pass
+
+
+def _cdp(ws_url: str, method: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """One DevTools protocol command on the browser target."""
+    ws = _WebSocket(ws_url)
+    try:
+        ws.send(json.dumps({"id": 1, "method": method, "params": params or {}}))
+        while True:
+            reply = json.loads(ws.recv())
+            if reply.get("id") == 1:
+                if "error" in reply:
+                    raise RuntimeError(f"{method}: {reply['error']}")
+                return reply.get("result") or {}
+    finally:
+        ws.close()
+
+
+def _warning_html(lang: str) -> str:
+    import html
+
+    t = {k: html.escape(v) for k, v in WARNING_PAGE[lang].items()}
+    return f"""<!doctype html>
+<html lang="{lang}"><head><meta charset="utf-8"><title>{t["heading"]}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+html, body {{ margin: 0; min-height: 100%; background: #b00020; color: #fff; }}
+body {{ font: 18px/1.6 system-ui, "Segoe UI", "Microsoft JhengHei", "Yu Gothic UI", "Malgun Gothic", sans-serif;
+       display: flex; align-items: center; justify-content: center; min-height: 100vh; }}
+main {{ max-width: 760px; padding: 48px 32px; }}
+h1 {{ font-size: 48px; line-height: 1.2; margin: 0 0 24px; }}
+.icon {{ font-size: 72px; line-height: 1; }}
+p {{ margin: 0 0 16px; }}
+.use {{ font-size: 24px; font-weight: 700; }}
+.note {{ opacity: .85; font-size: 16px; }}
+label {{ display: flex; gap: 12px; align-items: flex-start; margin: 28px 0; padding: 16px; font-weight: 700;
+        background: rgba(0,0,0,.25); border: 2px solid #fff; border-radius: 8px; cursor: pointer; }}
+input[type=checkbox] {{ width: 24px; height: 24px; flex: none; margin-top: 3px; }}
+button {{ font: inherit; font-weight: 700; padding: 14px 28px; border: 0; border-radius: 8px;
+         background: #fff; color: #b00020; cursor: pointer; }}
+button:disabled {{ background: rgba(255,255,255,.35); color: rgba(255,255,255,.8); cursor: not-allowed; }}
+</style></head>
+<body><main>
+<div class="icon" aria-hidden="true">&#9888;</div>
+<h1>{t["heading"]}</h1>
+<p>{t["risk"]}</p>
+<p class="use">{t["use"]}</p>
+<p class="note">{t["note"]}</p>
+<form method="post" action="accept">
+<label><input type="checkbox" id="understood" name="understood" value="yes" required> {t["check"]}</label>
+<button type="submit" id="continue">{t["continue"]}</button>
+</form>
+</main>
+<script>
+const box = document.getElementById("understood"), button = document.getElementById("continue");
+button.disabled = !box.checked;
+box.addEventListener("change", () => {{ button.disabled = !box.checked; }});
+</script>
+</body></html>
+"""
+
+
+class _Warning:
+    """The warning page of the sign-in window, on 127.0.0.1 under a random path. Accepting it (the checkbox, checked
+    here too) redirects to YouTube's sign-in page and sets `accepted`."""
+
+    def __init__(self, lang: str) -> None:
+        import http.server
+        import secrets
+        import threading
+
+        token = secrets.token_urlsafe(16)
+        page = _warning_html(lang).encode("utf-8")
+        self.accepted = threading.Event()
+        accepted = self.accepted
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def _send(self, status: int, body: bytes = b"", headers: Optional[Dict[str, str]] = None) -> None:
+                self.send_response(status)
+                for k, v in {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store",
+                             "Content-Length": str(len(body)), **(headers or {})}.items():
+                    self.send_header(k, v)
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_GET(self) -> None:  # noqa: N802
+                self._send(200, page) if self.path == f"/{token}/" else self._send(404)
+
+            def do_POST(self) -> None:  # noqa: N802
+                body = self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 4096)).decode("latin-1")
+                if self.path != f"/{token}/accept":
+                    self._send(404)
+                elif "understood=yes" not in body.split("&"):
+                    self._send(303, headers={"Location": f"/{token}/"})  # the box wasn't ticked: the page again
+                else:
+                    accepted.set()
+                    self._send(303, headers={"Location": SIGNIN_URL})
+
+            def log_message(self, *args: Any) -> None:
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}/{token}/"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+
+
+def _launch_browser(exe: str, profile: str, url: str) -> Any:
+    os.makedirs(profile, exist_ok=True)
+    try:
+        os.remove(os.path.join(profile, "DevToolsActivePort"))  # left by an earlier window
+    except OSError:
+        pass
+    args = [exe, f"--user-data-dir={profile}", "--remote-debugging-port=0", "--no-first-run",
+            "--no-default-browser-check", "--new-window", url]
+    return subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def _devtools_url(profile: str, proc: Any, cancel: Optional[Callable[[], None]]) -> str:
+    """The browser target's DevTools address, from the DevToolsActivePort file the browser writes in the profile."""
+    port_file = os.path.join(profile, "DevToolsActivePort")
+    end = time.monotonic() + SIGNIN_START_SEC
+    while time.monotonic() < end:
+        if cancel is not None:
+            cancel()
+        try:
+            with open(port_file, encoding="utf-8") as f:
+                port, path = f.read().split("\n")[:2]
+            if port.strip() and path.strip():
+                return f"ws://127.0.0.1:{int(port)}{path.strip()}"
+        except (OSError, ValueError):
+            pass
+        if proc.poll() is not None:
+            raise SignInClosed()
+        time.sleep(0.3)
+    raise RuntimeError(f"no DevToolsActivePort after {SIGNIN_START_SEC} s")
+
+
+def _signed_in(cookies: List[Dict[str, Any]]) -> bool:
+    return any(str(c.get("domain", "")).endswith("youtube.com") and c.get("name") in SIGNED_IN_COOKIES
+               for c in cookies)
+
+
+def _netscape(cookies: List[Dict[str, Any]]) -> str:
+    """youtube.com and google.com cookies as a Netscape cookies.txt (the format yt-dlp's `cookiefile` reads)."""
+    lines = ["# Netscape HTTP Cookie File", "# YouTube sign-in made in the KAREOKIE YouTube extension's window", ""]
+    for c in cookies:
+        domain = str(c.get("domain") or "")
+        if not domain.lstrip(".").endswith(SIGNIN_COOKIE_DOMAINS):
+            continue
+        expires = 0 if c.get("session") or float(c.get("expires") or -1) < 0 else int(float(c["expires"]))
+        lines.append("\t".join([
+            ("#HttpOnly_" if c.get("httpOnly") else "") + domain,
+            "TRUE" if domain.startswith(".") else "FALSE",
+            str(c.get("path") or "/"),
+            "TRUE" if c.get("secure") else "FALSE",
+            str(expires),
+            str(c.get("name") or ""),
+            str(c.get("value") or ""),
+        ]))
+    return "\n".join(lines) + "\n"
+
+
+def ensure_signin(progress: Optional[Callable[..., None]] = None,
+                  cancel: Optional[Callable[[], None]] = None) -> Optional[str]:
+    """With the signIn setting on and no working sign-in: open the sign-in window (the warning first) and wait for
+    the user. The cookies file (None: the setting is off, or the user's own cookies are set)."""
+    folder = _signin_dir()
+    if not _settings.get("signIn") or _own_cookies_set() or not folder:
+        return None
+    existing = _signin_cookies()
+    if existing and not os.path.exists(_refresh_marker()):
+        return existing
+    found = _chromium()
+    if not found:
+        raise readable_error("signin-browser", FileNotFoundError("Chrome / Edge"))
+    name, exe = found
+    profile = os.path.join(folder, "profile")
+    os.makedirs(profile, exist_ok=True)
+    print(f"[sign-in] opening {name} with the extension's own profile")
+    lang = _lang()
+    warning = _Warning(lang)
+    proc: Any = None
+    ws_url = ""
+    try:
+        proc = _launch_browser(exe, profile, warning.url)
+        ws_url = _devtools_url(profile, proc, cancel)
+        start = last_note = time.monotonic()
+        note = _text("signin-wait", browser=name, main=MAIN_ACCOUNT[lang])
+        if progress is not None:
+            progress(None, note)
+        while True:
+            if cancel is not None:
+                cancel()
+            if proc.poll() is not None:
+                raise SignInClosed()
+            cookies: List[Dict[str, Any]] = []
+            if warning.accepted.is_set():  # nothing is read before the user accepted the warning
+                try:
+                    cookies = _cdp(ws_url, "Storage.getCookies").get("cookies") or []
+                except (OSError, ConnectionError):
+                    if proc.poll() is not None:
+                        raise SignInClosed()
+            if _signed_in(cookies):
+                _wait(3, cancel)  # let youtube.com finish setting its cookies
+                cookies = _cdp(ws_url, "Storage.getCookies").get("cookies") or cookies
+                path = os.path.join(folder, "cookies.txt")
+                with open(path + ".tmp", "w", encoding="utf-8", newline="\n") as f:
+                    f.write(_netscape(cookies))
+                os.replace(path + ".tmp", path)
+                try:
+                    os.remove(_refresh_marker())
+                except OSError:
+                    pass
+                print("[sign-in] signed in: saved the sign-in's cookies")
+                return path
+            if time.monotonic() - start > SIGNIN_TIMEOUT_SEC:
+                raise readable_error("signin-timeout", TimeoutError(f"{SIGNIN_TIMEOUT_SEC} s"))
+            if progress is not None and time.monotonic() - last_note > SIGNIN_PROGRESS_EVERY_SEC:
+                progress(None, note)
+                last_note = time.monotonic()
+            _wait(SIGNIN_POLL_SEC, cancel)
+    except SignInClosed as exc:
+        raise readable_error("signin-closed", exc) from exc
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise readable_error("signin-failed", exc, browser=name) from exc
+    finally:
+        warning.close()
+        if proc is not None and proc.poll() is None:
+            try:
+                if ws_url:
+                    _cdp(ws_url, "Browser.close")
+            except Exception:  # noqa: BLE001 - it may close before it answers
+                pass
+            try:
+                proc.wait(timeout=10)
+            except Exception:  # noqa: BLE001 - the window didn't close by itself
+                proc.terminate()
+
+
+def _cookie_work_copy() -> str:
+    """A copy of cookies.txt for one yt-dlp call (yt-dlp rewrites its cookiefile in place when it closes)."""
+    folder = _signin_dir() or ""
+    for old in glob.glob(os.path.join(folder, "cookies.*.work")):
+        try:
+            if time.time() - os.path.getmtime(old) > WORK_COPY_STALE_SEC:
+                os.remove(old)
+        except OSError:
+            pass
+    work = os.path.join(folder, f"cookies.{os.getpid()}.{os.urandom(4).hex()}.work")
+    shutil.copyfile(os.path.join(folder, "cookies.txt"), work)
+    return work
+
+
+def _keep_cookies(work: str) -> None:
+    """Put the cookies yt-dlp saved (YouTube refreshes them) in place of cookies.txt in one step. Not after a
+    sign-out, and not a file a killed or failed save left empty or broken."""
+    path = os.path.join(_signin_dir() or "", "cookies.txt")
+    try:
+        with open(work, encoding="utf-8") as f:
+            ok = any(line.split("\t")[0].removeprefix("#HttpOnly_").lstrip(".").endswith("youtube.com")
+                     and line.count("\t") == 6 for line in f)
+        if ok and os.path.isfile(path):
+            os.replace(work, path)
+            return
+    except OSError:
+        pass
+    try:
+        os.remove(work)
+    except OSError:
+        pass
+
+
+class _SignedInYDL:
+    """A YoutubeDL using a copy of the sign-in's cookies.txt, which replaces the file when yt-dlp is done."""
+
+    def __init__(self, ydl: Any, work: str) -> None:
+        self.ydl = ydl
+        self.work = work
+
+    def __enter__(self) -> Any:
+        return self.ydl.__enter__()
+
+    def __exit__(self, *exc: Any) -> Any:
+        try:
+            return self.ydl.__exit__(*exc)
+        finally:
+            _keep_cookies(self.work)
 
 
 # ---------------------------------------------------------------------------
@@ -709,6 +1308,10 @@ def _ydl(opts: Dict[str, Any]) -> Any:
         if not os.path.isfile(cookie_file):
             raise readable_error("cookiefile", FileNotFoundError(cookie_file))
         base["cookiefile"] = cookie_file
+    elif browser not in BROWSERS and _using_signin():
+        work = _cookie_work_copy()
+        base["cookiefile"] = work
+        return _SignedInYDL(yt_dlp.YoutubeDL({**base, **opts}), work)
     return yt_dlp.YoutubeDL({**base, **opts})
 
 
@@ -816,7 +1419,12 @@ def _run(call: Callable[[], Any], progress: Optional[Callable[..., None]] = None
             raise exc
         if kind == "blocked" and key:
             _remember_blocked(key, True)
-        raise readable_error(kind, exc, again=again) from exc
+        signed_in = kind == "blocked" and _using_signin()
+        if signed_in:
+            # the next import opens the sign-in window again: its profile is usually still signed in
+            with open(_refresh_marker(), "w", encoding="utf-8"):
+                pass
+        raise readable_error(kind, exc, again=again, signed_in=signed_in) from exc
 
 
 def _video_key(url: str) -> str:
@@ -927,6 +1535,7 @@ def resolve(item_or_url: Any, dest_dir: str, progress: Callable[..., None], canc
     want_subs = _settings.get("subtitles", True)
     update_yt_dlp(progress)
     ensure_js_runtime(progress, cancel)
+    ensure_signin(progress, cancel)
     # 1. Download the highest bitrate audio stream as-is (no re-encode; KAREOKIE's separator
     #    decodes it once to 44.1 kHz float32) + subtitles
     out_tmpl = os.path.join(dest_dir, "raw_audio.%(ext)s")

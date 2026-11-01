@@ -13,6 +13,19 @@
 - Some blocks don't pass: one video can be blocked on every try while others play from the same network. A video
   blocked through every retry is remembered for 6 hours, and importing it again tries once and reports at once
   instead of waiting about a minute. A successful import forgets it.
+- New setting "Sign in to YouTube in a separate window (Chrome / Edge)", off by default, with a prominent warning
+  not to use a main account (YouTube may restrict or disable accounts that download). The next import opens Chrome
+  (or Edge) with a profile of the extension's own, never the usual one. Every time, it first shows a red full-window
+  warning page (served on 127.0.0.1, in the app's language) whose Continue button stays disabled until the user
+  ticks "I understand the risk, and I'm using a separately created secondary account"; closing the window cancels.
+  Then the user signs in to YouTube themselves, and the extension takes that window's youtube.com / google.com
+  cookies over the browser's DevTools connection, saves them as a cookies.txt in its data folder, closes the window
+  and downloads as that account.
+- The sign-in is kept across imports, app restarts and extension updates; yt-dlp's refreshed cookies are saved back
+  after every call through a copy that replaces the file in one step. When YouTube stops accepting it, the error
+  says so and the next import opens the window again (warning first; the kept profile is usually still signed in).
+  Only turning the setting off signs out (deletes the profile and the cookies). The user's own cookies.txt or
+  browser setting wins over it. The bot-check error points to it when Chrome or Edge is installed.
 
 ## 1.0.4 — 2026-11-01
 

@@ -1,4 +1,5 @@
-"""Bot-check retries in main._run and the messages' language (no network): python -m unittest discover tests"""
+"""Bot-check retries in main._run, the messages' language and the sign-in window (no network, no browser):
+python -m unittest discover tests"""
 
 import os
 import sys
@@ -36,12 +37,14 @@ class BotRetryTest(unittest.TestCase):
         main.BLOCKED_RETRY_DELAYS_QUICK_SEC = (0.01,)
         main.update_yt_dlp = lambda *a, **k: False  # no pip in tests
         main._firefox_found = lambda: False
+        self.chromium, main._chromium = main._chromium, lambda: None
         self.data = tempfile.TemporaryDirectory()
         main.setup({"settings": {}, "dataDir": self.data.name, "locale": "en"})
 
     def tearDown(self):
         (main.BLOCKED_RETRY_DELAYS_SEC, main.BLOCKED_RETRY_DELAYS_QUICK_SEC, main.update_yt_dlp,
          main._firefox_found) = self.saved
+        main._chromium = self.chromium
         self.data.cleanup()
 
     def test_import_goes_through_after_two_blocks(self):
@@ -127,9 +130,11 @@ class LanguageTest(unittest.TestCase):
     def setUp(self):
         self.saved = main._firefox_found
         main._firefox_found = lambda: False
+        self.chromium, main._chromium = main._chromium, lambda: None
 
     def tearDown(self):
         main._firefox_found = self.saved
+        main._chromium = self.chromium
         main.setup({"settings": {}})
 
     def blocked(self, locale=None, **settings):
@@ -173,6 +178,15 @@ class LanguageTest(unittest.TestCase):
         else:
             self.assertIn("a browser you’re signed in", text)
         self.assertIn("another network", text)
+
+    def test_blocked_with_chrome_or_edge_points_to_the_sign_in_window(self):
+        main._chromium = lambda: ("Edge", "msedge.exe")
+        text = str(self.blocked("en"))
+        self.assertIn("Turn on “Sign in to YouTube in a separate window”", text)
+        self.assertIn("opens Edge with a profile of its own", text)
+        self.assertIn("Don’t sign in with your main account", text)
+        self.assertNotIn("Chrome and Edge can’t be used", text)
+        self.assertIn("請勿登入主帳號：用帳號下載可能讓 YouTube 限制或停用該帳號", str(self.blocked("zh-TW")))
 
     def test_blocked_with_firefox_points_to_the_setting(self):
         main._firefox_found = lambda: True

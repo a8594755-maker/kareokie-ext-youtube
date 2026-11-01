@@ -24,9 +24,9 @@ yt-dlp into the extension's data folder (`<dataDir>/yt-dlp/<version>/`); the new
 An error a newer yt-dlp may fix ("confirm you're not a bot", missing formats, HTTP 403) checks again sooner and
 retries the import once. A "confirm you're not a bot" check is often a passing flag on one request, so a
 blocked import also waits and tries again (after 5, 15 and 30 s; searches once, after 3 s) before it reports
-the error. That error says what works on this computer: the user's own YouTube sign-in (Firefox when it is installed;
-on Windows otherwise a cookies.txt, since yt-dlp can't read Chrome's and Edge's encrypted cookies there), another
-network, or waiting. Some blocks don't pass, so a video blocked through every retry is remembered for 6 hours and
+the error. That error says what works on this computer: a YouTube sign-in (the sign-in window below when Chrome or
+Edge is installed, Firefox when it is; otherwise a cookies.txt, since on Windows yt-dlp can't read Chrome's and
+Edge's encrypted cookies), another network, or waiting. Some blocks don't pass, so a video blocked through every retry is remembered for 6 hours and
 importing it again reports at once instead of waiting (`<dataDir>/blocked.json`). With a JavaScript runtime installed (deno, Node.js or Bun), yt-dlp solves YouTube's
 player challenges with it and finds every format.
 
@@ -47,6 +47,33 @@ The extension runs in KAREOKIE's own Python on the Mac too; nothing is Windows-o
   Access for KAREOKIE.
 - With an app that doesn't pass its language, error messages follow the first of the Mac's preferred languages.
 
+### Sign-in window
+
+> **Don't sign in with your main account.** Downloading with an account may make YouTube restrict or disable it.
+> Use a separately created secondary account.
+
+With "Sign in to YouTube in a separate window" on, the next import opens Chrome (or Edge) with a profile of the
+extension's own (`<dataDir>/signin/profile`, started with `--user-data-dir` and `--remote-debugging-port=0`; the
+user's usual profile is never touched).
+
+1. **Warning first, every time.** The window opens on a full-window red warning page, served by the extension on
+   `127.0.0.1` under a random path, in the app's language. Its Continue button stays disabled until the user ticks
+   "I understand the risk, and I'm using a separately created secondary account" (the server checks it too). Only
+   then does it go on to YouTube's sign-in page. Closing the window cancels the sign-in. Nothing is read from the
+   browser before the warning is accepted.
+2. **The user signs in** there themselves, including any Google verification.
+3. The extension waits (up to 15 minutes, cancellable) until youtube.com has a signed-in session, reads that window's
+   youtube.com and google.com cookies with the DevTools protocol's `Storage.getCookies` (a small standard-library
+   WebSocket client, no extra dependency), writes them to `<dataDir>/signin/cookies.txt` and closes the window.
+
+The sign-in is kept: yt-dlp downloads with it and saves the cookies YouTube refreshes back to it after every call
+(through a copy that replaces `cookies.txt` in one step, so a call killed mid-write can't break it). `dataDir`
+survives app restarts and extension updates, so there's no need to sign in again. When YouTube stops accepting it,
+the error says so and the next import opens the window again (warning first); the kept profile is usually still
+signed in, so it just closes again with fresh cookies. Only turning the setting off (sign-out) deletes the profile
+and the cookies. Cookie values are never logged or put in messages, and only yt-dlp's requests to YouTube / Google
+use them.
+
 ### Language
 
 Error and progress messages are in English, Traditional Chinese, Japanese or Korean: the app's language when the app
@@ -58,6 +85,7 @@ passes it (`context["locale"]`), otherwise the system's display language.
 |---|---|
 | Download the music video | off: audio only, the stage shows the thumbnail |
 | Use the uploader's subtitles as lyrics candidates | |
+| Sign in to YouTube in a separate window (Chrome / Edge) | off by default. See "Sign-in window" above. Your own cookies.txt or browser setting wins over it. |
 | Use my YouTube sign-in from a browser | off by default. For networks YouTube keeps blocking with "confirm you're not a bot": yt-dlp reads that browser's YouTube cookies and downloads as you. On Windows only Firefox works reliably (Chrome, Edge and Brave encrypt their cookies); on a Mac all four work (macOS asks for your password for Chrome, Edge and Brave). YouTube may restrict accounts that download a lot. |
 | Or a cookies.txt file | a Netscape-format cookies.txt exported from a signed-in browser |
 
