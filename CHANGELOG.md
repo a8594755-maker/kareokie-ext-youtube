@@ -35,6 +35,8 @@
   own `tools/kext.py` (no fallback into a KAREOKIE checkout). From app 0.2.8, which shows errors without the
   exception class, a message's title is in the message itself; older apps still get it as the class name. The README
   links only the public site and SDK.
+- Cancelling an import stops it at once, also while yt-dlp is still reading YouTube's pages (before only its
+  download noticed a cancel, and the app killed the call 3 s later). Found by the SDK's `kext test`, which 1.0.5 passes.
 - Messages follow the app's language: newer KAREOKIE versions pass it to extensions (`locale`: English,
   Traditional Chinese, Japanese, Korean); older ones fall back to the system's display language as before. Korean
   is new. Progress messages (bot-check waits, the sign-in, yt-dlp updates) are translated too.

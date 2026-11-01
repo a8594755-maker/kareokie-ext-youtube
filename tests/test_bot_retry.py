@@ -13,7 +13,9 @@ BLOCKED = "ERROR: [youtube] abc: Sign in to confirm you’re not a bot. Use --co
 
 
 class Cancelled(Exception):
-    pass
+    @staticmethod
+    def throw():
+        raise Cancelled()
 
 
 def flaky(failures, error=BLOCKED):
@@ -116,6 +118,49 @@ class BotRetryTest(unittest.TestCase):
         finally:
             main.BLOCKED_REMEMBER_SEC = saved
 
+    def test_a_cancel_stops_a_call_that_has_no_cancel_point(self):
+        import threading
+        import time
+
+        stop = threading.Event()
+
+        def busy():  # yt-dlp reading YouTube's pages: no cancel() in there
+            stop.wait(10)
+            return "late"
+
+        polls = []
+
+        def cancel():
+            polls.append(1)
+            if len(polls) > 2:
+                raise Cancelled()
+
+        started = time.monotonic()
+        with self.assertRaises(Cancelled):
+            main._cancellable(busy, cancel)
+        self.assertLess(time.monotonic() - started, 2)
+        stop.set()
+        self.assertEqual(main._cancellable(lambda: "done", lambda: None), "done")
+        with self.assertRaises(ValueError):
+            main._cancellable(lambda: int("x"), lambda: None)
+
+    def test_a_cancelled_music_video_is_not_a_failed_one(self):
+        import time
+
+        saved = main._ydl
+
+        def ydl(opts, account=False, logger=None):
+            time.sleep(5)  # reading YouTube's pages
+            raise RuntimeError("too late")
+
+        main._ydl = ydl
+        try:
+            with self.assertRaises(Cancelled):
+                main.fetch_video("YJfHuATJYsQ", self.data.name, lambda *a: None, Cancelled.throw,
+                                 {"videoMaxHeight": 720})
+        finally:
+            main._ydl = saved
+
     def test_video_key(self):
         for url in ("https://www.youtube.com/watch?v=YJfHuATJYsQ&t=5", "https://youtu.be/YJfHuATJYsQ",
                     "https://m.youtube.com/shorts/YJfHuATJYsQ", "https://www.youtube.com/watch?list=x&v=YJfHuATJYsQ"):
@@ -179,6 +224,12 @@ class LanguageTest(unittest.TestCase):
             self.assertEqual(type(err).__name__, "YouTube 要求確認你不是機器人", version)
             self.assertTrue(str(err).startswith("每次重試都被擋下"), version)
             self.assertTrue(err.sentence.startswith("YouTube 要求確認你不是機器人：每次"), version)
+
+    def test_the_action_fits_the_apps_limits(self):
+        # the app shows a button label up to 60 characters and a hint up to 200 (longer ones are dropped or cut)
+        for lang, (label, hint) in main.ACTION_SIGNIN.items():
+            self.assertLessEqual(len(label), 60, lang)
+            self.assertLessEqual(len(hint), 200, lang)
 
     def test_no_settings_left_to_point_to(self):
         for lang in ("en", "zh-TW", "ja", "ko"):

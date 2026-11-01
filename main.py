@@ -1398,6 +1398,31 @@ BLOCKED_RETRY_DELAYS_QUICK_SEC = (3,)
 BLOCKED_REMEMBER_SEC = 6 * 3600
 
 
+def _cancellable(fn: Callable[[], Any], cancel: Optional[Callable[[], None]]) -> Any:
+    """Run fn in a thread while this one polls cancel(): yt-dlp only notices a cancel in its download hook, not while
+    it reads YouTube's pages, and the app kills a call that keeps running 3 s after a cancel."""
+    if cancel is None:
+        return fn()
+    import threading
+
+    box: Dict[str, Any] = {}
+
+    def run() -> None:
+        try:
+            box["value"] = fn()
+        except BaseException as exc:  # noqa: BLE001 - handed to the caller below
+            box["error"] = exc
+
+    worker = threading.Thread(target=run, daemon=True)  # a cancelled call's process ends with it
+    worker.start()
+    while worker.is_alive():
+        cancel()
+        worker.join(0.2)
+    if "error" in box:
+        raise box["error"]
+    return box.get("value")
+
+
 def _wait(seconds: float, cancel: Optional[Callable[[], None]]) -> None:
     """Sleep, polling the app's cancel() so a cancelled import stops right away."""
     end = time.monotonic() + seconds
@@ -1816,7 +1841,7 @@ def resolve(item_or_url: Any, dest_dir: str, progress: Callable[..., None], canc
     options = options or {}
     url = _url(item_or_url)
     want_subs = _settings.get("subtitles", True)
-    update_yt_dlp(progress)
+    _cancellable(lambda: update_yt_dlp(progress), cancel)
     ensure_js_runtime(progress, cancel)
     # 1. Download the highest bitrate audio stream as-is (no re-encode; KAREOKIE's separator
     #    decodes it once to 44.1 kHz float32) + subtitles
@@ -1836,8 +1861,11 @@ def resolve(item_or_url: Any, dest_dir: str, progress: Callable[..., None], canc
     }
 
     def call_with(account: bool, logger: Any) -> Dict[str, Any]:
-        with _ydl(ydl_audio_opts, account=account, logger=logger) as ydl:
-            return ydl.extract_info(url, download=True) or {}
+        def run() -> Dict[str, Any]:
+            with _ydl(ydl_audio_opts, account=account, logger=logger) as ydl:
+                return ydl.extract_info(url, download=True) or {}
+
+        return _cancellable(run, cancel)
 
     info = _download(call_with, progress, cancel, _video_key(url))
 
@@ -1908,9 +1936,14 @@ def fetch_video(item_or_url: Any, dest_dir: str, progress: Callable[..., None], 
             "outtmpl": os.path.join(dest_dir, "video.%(ext)s"),
             "progress_hooks": [_hook(progress, cancel)],
         }
-        with _ydl(opts) as ydl:
-            ydl.download([_url(item_or_url)])
+        def run() -> None:
+            with _ydl(opts) as ydl:
+                ydl.download([_url(item_or_url)])
+
+        _cancellable(run, cancel)
     except Exception as exc:  # noqa: BLE001 - the stage falls back to the YouTube embed / thumbnail
+        if "cancel" in type(exc).__name__.lower():
+            raise  # the user cancelled the import (the app's cancel()), not a failed download
         print(f"[Video Download Note] Using YouTube embed fallback: {exc}")
     path = _video_in(dest_dir)
     if path is None:
