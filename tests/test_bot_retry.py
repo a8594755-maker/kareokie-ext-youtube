@@ -193,6 +193,22 @@ class LanguageTest(unittest.TestCase):
         for by_lang in (main.ACTION_SIGNIN, main.WARNING_PAGE, main.CAP_PAGE, main.MAIN_ACCOUNT):
             self.assertEqual(set(by_lang), langs)
 
+    def test_older_apps_language_from_the_desktop_settings(self):
+        # apps before 0.2.8 pass no locale; the desktop app keeps the language the user picked in settings.json
+        import json
+        with tempfile.TemporaryDirectory() as home:
+            data = os.path.join(home, "data", "extensions", "_data", "youtube")
+            os.makedirs(data)
+            settings = os.path.join(home, "settings.json")
+            system = (main.setup({"settings": {}}), main._lang())[1]
+            for language, lang in (("zh-TW", "zh-TW"), ("ko", "ko"), ("auto", system)):
+                with open(settings, "w", encoding="utf-8") as f:
+                    json.dump({"port": 1, "language": language}, f)
+                main.setup({"settings": {}, "dataDir": data})
+                self.assertEqual(main._lang(), lang, language)
+            main.setup({"settings": {}, "dataDir": data, "locale": "ja"})
+            self.assertEqual(main._lang(), "ja")  # the app's locale wins
+
     def test_retry_progress_follows_the_app(self):
         main.setup({"settings": {}, "locale": "zh-TW"})
         self.assertEqual(main._text("retry", delay=5, attempt=1, total=3), "YouTube 要求確認不是機器人，5 秒後重試（1/3）…")

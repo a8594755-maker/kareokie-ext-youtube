@@ -51,7 +51,7 @@ class FakeBrowser:
     """subprocess.Popen of the sign-in window: the user picks `choice` on its page at poll `accepts_at` (None: never;
     on the warning, with the box ticked) and closes the window after `closes_after` polls (None: never)."""
 
-    def __init__(self, accepts_at=1, closes_after=None, choice="continue"):
+    def __init__(self, accepts_at=1, closes_after=2, choice="continue"):
         self.accepts_at = accepts_at
         self.choice = choice
         self.closes_after = closes_after
@@ -94,7 +94,13 @@ class SignInBase(unittest.TestCase):
         self.browser = FakeBrowser()
         main._chromium = lambda: ("Chrome", "chrome.exe")
 
-        def launch(exe, profile, url):
+        self.launches = []  # (debug, headless) of each browser started
+
+        def launch(exe, profile, url, debug=True, headless=False):
+            self.launches.append((debug, headless))
+            if headless:  # reading the profile's cookies after the window closed: open until Browser.close
+                self.reader = FakeBrowser(accepts_at=None, closes_after=None)
+                return self.reader
             self.browser.url = url
             return self.browser
 
@@ -107,7 +113,7 @@ class SignInBase(unittest.TestCase):
         def cdp(url, method, params=None):
             self.commands.append(method)
             if method == "Browser.close":
-                self.browser.closed = True
+                (self.reader if self.launches[-1][1] else self.browser).closed = True
                 return {}
             return {"cookies": list(self.cookies.pop(0) if self.cookies else [])}
 
@@ -132,15 +138,18 @@ class SignInBase(unittest.TestCase):
 
 class SignInTest(SignInBase):
     def test_signs_in_writes_cookies_and_closes_the_window(self):
-        self.cookies = [[], [SIGNED_IN[2]], SIGNED_IN, SIGNED_IN]  # Google first, then youtube.com
+        self.cookies = [SIGNED_IN]
         messages = []
         path = main.ensure_signin(lambda p, m: messages.append(m), lambda: None)
         self.assertEqual(path, os.path.join(self.data.name, "signin", "cookies.txt"))
         self.assertEqual(main._signin_cookies(), path)
-        self.assertEqual(self.commands[-1], "Browser.close")
-        self.assertTrue(self.browser.closed)
+        # the user signs in in a plain window (no DevTools: Google refuses a driven browser) and closes it; then a
+        # headless browser on the profile reads the cookies and closes
+        self.assertEqual(self.launches, [(False, False), (True, True)])
+        self.assertEqual(self.commands, ["Storage.getCookies", "Browser.close"])
+        self.assertTrue(self.reader.closed)
         self.assertTrue(messages[0].startswith("Don’t sign in with your main account"))
-        self.assertIn("Read the warning in the Chrome window", messages[0])
+        self.assertIn("sign in to YouTube there, then close the window", messages[0])
         with open(path, encoding="utf-8") as f:
             lines = f.read().splitlines()
         self.assertEqual(lines[0], "# Netscape HTTP Cookie File")
@@ -197,6 +206,31 @@ class SignInTest(SignInBase):
         self.assertTrue(messages[0].startswith(
             "請勿登入主帳號：用帳號下載可能讓 YouTube 限制或停用該帳號，請使用另外申請的小帳號。請先看完剛開啟的 Chrome 視窗裡的警告"))
 
+    def test_window_closed_without_signing_in(self):
+        self.cookies = [[SIGNED_IN[3]]]  # accepted the warning, closed on Google's page
+        self.host("zh-TW")
+        with self.assertRaises(main.YouTubeError) as err:
+            main.ensure_signin(None, lambda: None)
+        self.assertEqual(type(err.exception).__name__, "YouTube 登入已取消")
+        self.assertIsNone(main._signin_cookies())
+        self.assertTrue(self.reader.closed)
+
+    def test_the_browser_follows_the_app_language(self):
+        saved, made = main.subprocess.Popen, []
+        main._launch_browser = self.saved["_launch_browser"]
+        main.subprocess.Popen = lambda args, **kw: made.append(args)
+        try:
+            for locale, flag in (("zh-TW", "--lang=zh-TW"), ("en", "--lang=en-US"), ("ja", "--lang=ja")):
+                self.host(locale)
+                main._launch_browser("chrome.exe", os.path.join(self.data.name, "p"), "http://x/", debug=False)
+                self.assertIn(flag, made[-1])
+                self.assertFalse(any(a.startswith("--remote-debugging") for a in made[-1]))
+            main._launch_browser("chrome.exe", os.path.join(self.data.name, "p"), "about:blank", headless=True)
+            self.assertIn("--remote-debugging-port=0", made[-1])
+            self.assertIn("--headless=new", made[-1])
+        finally:
+            main.subprocess.Popen = saved
+
     def test_window_closed_before_signing_in(self):
         self.browser = FakeBrowser(accepts_at=None, closes_after=2)
         self.host("zh-TW")
@@ -215,7 +249,7 @@ class SignInTest(SignInBase):
 
         with self.assertRaises(Cancelled):
             main.ensure_signin(None, cancel)
-        self.assertEqual(self.commands[-1], "Browser.close")
+        self.assertEqual(self.commands, [])
         self.assertTrue(self.browser.closed)
 
     def test_gives_up_after_the_timeout(self):

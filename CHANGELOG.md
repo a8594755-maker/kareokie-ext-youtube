@@ -9,9 +9,13 @@
   Every time, the window first shows a red full-window warning, "Don't sign in with your main account" (YouTube may
   restrict or disable accounts that download), served on 127.0.0.1 in the app's language. Its Continue button stays
   disabled until the user ticks "I understand the risk, and I'm using a separately created secondary account";
-  closing the window cancels. The user then signs in themselves. The extension takes that window's youtube.com /
-  google.com cookies over the browser's DevTools connection, saves them as a cookies.txt in its data folder and
-  closes the window, and the app retries the import.
+  closing the window before that cancels. The user then signs in themselves and closes the window. The window is a
+  plain browser with nothing attached (Google refuses to sign in a browser it sees being driven over DevTools:
+  "This browser or app may not be secure"). Once it is closed, a headless browser on the same profile reads its
+  youtube.com / google.com cookies, the extension saves them as a cookies.txt in its data folder, and the app
+  retries the import. The browser shows Google's pages in the app's language (`--lang`).
+- Apps before 0.2.8 don't pass their language: the messages then follow the language picked in the desktop app
+  (its settings.json above the extension's data folder) before the system's.
 - New extension method `action(action_id, progress, cancel, options)` with `signin` and `signout`. Apps that show
   action buttons pass `context["features"] = ["actions"]`. The manifest lists the ids as a top-level `"actions"`
   key (current apps reject unknown capabilities but ignore unknown keys), with `timeouts.action` = 900 s. Older

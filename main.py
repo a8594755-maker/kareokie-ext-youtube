@@ -599,11 +599,13 @@ PROGRESS: Dict[str, Dict[str, str]] = {
         "ko": "YouTube 로그인을 사용하는 다른 다운로드가 끝나기를 기다리는 중…",
     },
     "signin-wait": {
-        "en": "{main} Read the warning in the {browser} window that opened, then sign in to YouTube there. Waiting…",
-        "zh-TW": "{main}請先看完剛開啟的 {browser} 視窗裡的警告，再在裡面登入 YouTube。等待登入中…",
-        "ja": "{main}開いた {browser} のウィンドウの警告を読んでから、そこで YouTube にログインしてください。"
-              "ログインを待っています…",
-        "ko": "{main} 열린 {browser} 창의 경고를 읽은 뒤 거기서 YouTube에 로그인하세요. 로그인을 기다리는 중…",
+        "en": "{main} Read the warning in the {browser} window that opened, sign in to YouTube there, then close "
+              "the window. Waiting…",
+        "zh-TW": "{main}請先看完剛開啟的 {browser} 視窗裡的警告，在裡面登入 YouTube，登入後關閉視窗。等待中…",
+        "ja": "{main}開いた {browser} のウィンドウの警告を読んでから、そこで YouTube にログインし、ログインしたら"
+              "ウィンドウを閉じてください。待っています…",
+        "ko": "{main} 열린 {browser} 창의 경고를 읽은 뒤 거기서 YouTube에 로그인하고, 로그인했으면 창을 닫으세요. "
+              "기다리는 중…",
     },
     "retry": {
         "en": "YouTube asked to confirm this isn’t a bot; trying again in {delay} s ({attempt}/{total})…",
@@ -647,11 +649,32 @@ def _lang_of(tag: str) -> str:
     return "en"
 
 
+def _desktop_app_language() -> str:
+    """Apps before 0.2.8 don't pass their language: the desktop app's settings.json, a few folders above this
+    extension's data folder, has the one the user picked ("" when there is none)."""
+    folder = _context.get("dataDir")
+    for _ in range(6):
+        if not folder:
+            return ""
+        try:
+            with open(os.path.join(folder, "settings.json"), encoding="utf-8") as f:
+                language = json.load(f).get("language")
+            if isinstance(language, str):  # "auto" or anything else unknown: the system's language decides
+                return language if language.lower()[:2] in ("en", "zh", "ja", "ko") else ""
+        except (OSError, ValueError, AttributeError):
+            pass
+        parent = os.path.dirname(folder)
+        folder = parent if parent != folder else ""
+    return ""
+
+
 def _lang() -> str:
     """The app's language (context["locale"], from newer apps), else the system's display language."""
     if _context.get("locale"):
         return _lang_of(str(_context["locale"]))
-    tag = ""
+    tag = _desktop_app_language()
+    if tag:
+        return _lang_of(tag)
     if sys.platform == "win32":
         try:
             import ctypes
@@ -811,8 +834,8 @@ WARNING_PAGE: Dict[str, Dict[str, str]] = {
         "use": "Use a separately created secondary account.",
         "limits": "The extension keeps account use to a minimum (only when YouTube blocks a download without it, "
                   "and it asks you after {cap} a day), but can’t guarantee the account won’t be restricted.",
-        "note": "This window uses a browser profile of the extension’s own, separate from your usual one. Closing it "
-                "cancels the sign-in.",
+        "note": "This window uses a browser profile of the extension’s own, separate from your usual one. Once "
+                "YouTube shows you signed in, close the window: the extension then saves the sign-in.",
         "check": "I understand the risk, and I’m using a separately created secondary account",
         "continue": "Continue to sign-in",
     },
@@ -822,7 +845,8 @@ WARNING_PAGE: Dict[str, Dict[str, str]] = {
                 "如果是你的主要 Google 帳號，同一個帳號裡的 Gmail、相片和雲端硬碟也可能受影響。",
         "use": "請使用另外申請的小帳號。",
         "limits": "擴充功能會盡量少用這個帳號（只在不登入下載被擋時才用，每天超過 {cap} 次會先問你），但無法保證帳號不會被限制。",
-        "note": "這個視窗使用擴充功能專用的瀏覽器設定檔，和你平常用的分開。關閉視窗即取消登入。",
+        "note": "這個視窗使用擴充功能專用的瀏覽器設定檔，和你平常用的分開。YouTube 顯示已登入後，關閉這個視窗，"
+                "擴充功能就會保存登入狀態。",
         "check": "我了解風險，我使用的是另外申請的小帳號",
         "continue": "繼續前往登入",
     },
@@ -834,8 +858,8 @@ WARNING_PAGE: Dict[str, Dict[str, str]] = {
         "use": "別に作成したサブアカウントを使ってください。",
         "limits": "拡張機能はこのアカウントの使用を最小限にします（ログインなしのダウンロードがブロックされたときだけ、"
                   "1 日 {cap} 回を超えると確認します）が、制限されないことは保証できません。",
-        "note": "このウィンドウは普段とは別の、拡張機能専用のブラウザプロファイルを使っています。閉じるとログインは"
-                "キャンセルされます。",
+        "note": "このウィンドウは普段とは別の、拡張機能専用のブラウザプロファイルを使っています。YouTube で"
+                "ログインできたらウィンドウを閉じてください。拡張機能がログイン状態を保存します。",
         "check": "リスクを理解しており、別に作成したサブアカウントを使います",
         "continue": "ログインに進む",
     },
@@ -847,8 +871,8 @@ WARNING_PAGE: Dict[str, Dict[str, str]] = {
         "use": "별도로 만든 보조 계정을 사용하세요.",
         "limits": "확장 프로그램은 이 계정 사용을 최소화하지만(로그인 없이 다운로드가 차단될 때만, 하루 {cap}회가 넘으면 확인) "
                   "계정이 제한되지 않는다고 보장할 수는 없습니다.",
-        "note": "이 창은 평소 프로필과 분리된 확장 프로그램 전용 브라우저 프로필을 사용합니다. 창을 닫으면 로그인이 "
-                "취소됩니다.",
+        "note": "이 창은 평소 프로필과 분리된 확장 프로그램 전용 브라우저 프로필을 사용합니다. YouTube에 로그인되면 "
+                "창을 닫으세요. 그러면 확장 프로그램이 로그인 상태를 저장합니다.",
         "check": "위험을 이해했으며, 별도로 만든 보조 계정을 사용합니다",
         "continue": "로그인 계속",
     },
@@ -1128,15 +1152,35 @@ def _Warning(lang: str) -> _LocalPage:  # noqa: N802
     return _LocalPage(_warning_html(lang), {"continue": SIGNIN_URL}, require="understood")
 
 
-def _launch_browser(exe: str, profile: str, url: str) -> Any:
+BROWSER_LANG = {"en": "en-US", "zh-TW": "zh-TW", "ja": "ja", "ko": "ko"}
+
+
+def _launch_browser(exe: str, profile: str, url: str, debug: bool = True, headless: bool = False) -> Any:
+    """The browser on the extension's profile, in the user's language. `debug`: with a DevTools address (never for
+    the sign-in window: Google refuses to sign in a browser it sees being driven)."""
     os.makedirs(profile, exist_ok=True)
+    args = [exe, f"--user-data-dir={profile}", "--no-first-run", "--no-default-browser-check",
+            f"--lang={BROWSER_LANG[_lang()]}"]
+    if debug:
+        try:
+            os.remove(os.path.join(profile, "DevToolsActivePort"))  # left by an earlier window
+        except OSError:
+            pass
+        args.append("--remote-debugging-port=0")
+    args += ["--headless=new", "--mute-audio"] if headless else ["--new-window"]
+    return subprocess.Popen(args + [url], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL)
+
+
+def _profile_cookies(exe: str, profile: str, cancel: Optional[Callable[[], None]]) -> List[Dict[str, Any]]:
+    """The cookies the profile saved, read by a headless browser on it after the sign-in window closed."""
+    proc = _launch_browser(exe, profile, "about:blank", headless=True)
+    ws_url = ""
     try:
-        os.remove(os.path.join(profile, "DevToolsActivePort"))  # left by an earlier window
-    except OSError:
-        pass
-    args = [exe, f"--user-data-dir={profile}", "--remote-debugging-port=0", "--no-first-run",
-            "--no-default-browser-check", "--new-window", url]
-    return subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        ws_url = _devtools_url(profile, proc, cancel)
+        return _cdp(ws_url, "Storage.getCookies").get("cookies") or []
+    finally:
+        _close_browser(proc, ws_url)
 
 
 def _devtools_url(profile: str, proc: Any, cancel: Optional[Callable[[], None]]) -> str:
@@ -1209,59 +1253,54 @@ def ensure_signin(progress: Optional[Callable[..., None]] = None, cancel: Option
     lang = _lang()
     warning = _Warning(lang)
     proc: Any = None
-    ws_url = ""
     try:
-        proc = _launch_browser(exe, profile, warning.url)
-        ws_url = _devtools_url(profile, proc, cancel)
+        # a plain window, nothing attached: the user signs in, then closes it
+        proc = _launch_browser(exe, profile, warning.url, debug=False)
         start = last_note = time.monotonic()
         note = _text("signin-wait", browser=name, main=MAIN_ACCOUNT[lang])
         if progress is not None:
             progress(None, note)
-        while True:
+        while proc.poll() is None:
             if cancel is not None:
                 cancel()
-            if proc.poll() is not None:
-                raise SignInClosed()
-            cookies: List[Dict[str, Any]] = []
-            if warning.accepted:  # nothing is read before the user accepted the warning
-                try:
-                    cookies = _cdp(ws_url, "Storage.getCookies").get("cookies") or []
-                except (OSError, ConnectionError):
-                    if proc.poll() is not None:
-                        raise SignInClosed()
-            if _signed_in(cookies):
-                _wait(3, cancel)  # let youtube.com finish setting its cookies
-                cookies = _cdp(ws_url, "Storage.getCookies").get("cookies") or cookies
-                path = os.path.join(folder, "cookies.txt")
-                with open(path + ".tmp", "w", encoding="utf-8", newline="\n") as f:
-                    f.write(_netscape(cookies))
-                os.replace(path + ".tmp", path)
-                try:
-                    os.remove(_refresh_marker())
-                except OSError:
-                    pass
-                print("[sign-in] signed in: saved the sign-in's cookies")
-                return path
             if time.monotonic() - start > SIGNIN_TIMEOUT_SEC:
                 raise readable_error("signin-timeout", TimeoutError(f"{SIGNIN_TIMEOUT_SEC} s"))
             if progress is not None and time.monotonic() - last_note > SIGNIN_PROGRESS_EVERY_SEC:
                 progress(None, note)
                 last_note = time.monotonic()
             _wait(SIGNIN_POLL_SEC, cancel)
+        proc = None
+        if not warning.accepted:  # nothing is read before the user accepted the warning
+            raise SignInClosed()
+        cookies = _profile_cookies(exe, profile, cancel)
+        if not _signed_in(cookies):
+            raise SignInClosed()
+        path = os.path.join(folder, "cookies.txt")
+        with open(path + ".tmp", "w", encoding="utf-8", newline="\n") as f:
+            f.write(_netscape(cookies))
+        os.replace(path + ".tmp", path)
+        try:
+            os.remove(_refresh_marker())
+        except OSError:
+            pass
+        print("[sign-in] signed in: saved the sign-in's cookies")
+        return path
     except SignInClosed as exc:
         raise readable_error("signin-closed", exc) from exc
     except (OSError, RuntimeError, ValueError) as exc:
         raise readable_error("signin-failed", exc, browser=name) from exc
     finally:
         warning.close()
-        _close_browser(proc, ws_url)
+        _close_browser(proc, "")
 
 
 def _close_browser(proc: Any, ws_url: str) -> None:
     if proc is not None and proc.poll() is None:
+        if not ws_url:  # nothing to ask it to close with
+            proc.terminate()
+            return
         try:
-            if ws_url:
-                _cdp(ws_url, "Browser.close")
+            _cdp(ws_url, "Browser.close")
         except Exception:  # noqa: BLE001 - it may close before it answers
             pass
         try:
