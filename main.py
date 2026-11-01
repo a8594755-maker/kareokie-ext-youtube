@@ -39,13 +39,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 def setup(context: Dict[str, Any]) -> None:
     """Called by the app before every call: {settings, dataDir, appVersion, extensionId, version}, and in newer
-    apps {locale}: the app's language (en, zh-TW, ja, ko)."""
+    apps {locale}: the app's language (en, zh-TW, ja, ko), and {features}: ["actions"] when the import panel shows
+    an error's action as a button (see "Actions")."""
     _context.clear()
     _context.update(context or {})
     _settings.clear()
     _settings.update(context.get("settings") or {})
-    if not _settings.get("signIn"):
-        sign_out()  # the setting was turned off: delete the sign-in window's profile and cookies
 
 
 # ---------------------------------------------------------------------------
@@ -397,131 +396,92 @@ def ensure_js_runtime(progress: Optional[Callable[..., None]] = None,
 # region, removed, 429, network) pass through unchanged. Messages and progress follow the app's language.
 # ---------------------------------------------------------------------------
 
-BROWSERS = {"firefox": "Firefox", "chrome": "Chrome", "edge": "Edge", "brave": "Brave"}
-
 MESSAGES: Dict[str, Dict[str, Tuple[str, str]]] = {
     # the body is the start of the message: readable_error() adds what works on this computer (BLOCKED_HINTS)
     "blocked": {
         "en": ("YouTube asked to confirm you’re not a bot",
-               "It kept asking on every try, so waiting a minute won’t help. What works on this computer:"),
+               "It kept asking on every try, so waiting a minute won’t help."),
         "zh-TW": ("YouTube 要求確認你不是機器人",
-                  "每次重試都被擋下，再等一下也沒用。在這台電腦上可以這樣做："),
+                  "每次重試都被擋下，再等一下也沒用。"),
         "ja": ("YouTube がボットではないことの確認を求めています",
-               "毎回ブロックされたため、少し待っても解決しません。このパソコンでできること："),
+               "毎回ブロックされたため、少し待っても解決しません。"),
         "ko": ("YouTube에서 로봇이 아닌지 확인을 요청했습니다",
-               "매번 차단되어 조금 기다려도 해결되지 않습니다. 이 PC에서 할 수 있는 방법:"),
+               "매번 차단되어 조금 기다려도 해결되지 않습니다."),
     },
     "blocked-again": {
         "en": ("YouTube asked to confirm you’re not a bot",
-               "This video was blocked the last time too, so it wasn’t tried again. What works on this computer:"),
+               "This video was blocked the last time too, so it wasn’t tried again."),
         "zh-TW": ("YouTube 要求確認你不是機器人",
-                  "這支影片上次也被擋下，所以這次沒有再等待重試。在這台電腦上可以這樣做："),
+                  "這支影片上次也被擋下，所以這次沒有再等待重試。"),
         "ja": ("YouTube がボットではないことの確認を求めています",
-               "この動画は前回もブロックされたため、待って再試行はしていません。このパソコンでできること："),
+               "この動画は前回もブロックされたため、待って再試行はしていません。"),
         "ko": ("YouTube에서 로봇이 아닌지 확인을 요청했습니다",
-               "이 동영상은 지난번에도 차단되어 이번에는 기다렸다가 다시 시도하지 않았습니다. 이 PC에서 할 수 있는 방법:"),
+               "이 동영상은 지난번에도 차단되어 이번에는 기다렸다가 다시 시도하지 않았습니다."),
     },
-    "cookies": {
-        "en": ("Couldn’t read your YouTube sign-in from {browser}",
-               "Make sure {browser} is installed and signed in to YouTube, close it and retry. On Windows, Chrome, Edge "
-               "and Brave encrypt their cookies, so they usually can’t be read: Firefox works best. Or set this "
-               "extension’s “Use my YouTube sign-in from a browser” back to “Don’t use”."),
-        "zh-TW": ("讀不到 {browser} 的 YouTube 登入狀態",
-                  "請確認已安裝 {browser} 並登入 YouTube，關閉瀏覽器後再重試。Windows 上的 Chrome、Edge、Brave 會加密 Cookie，"
-                  "通常讀不到，Firefox 最可靠。也可以把擴充功能設定的「使用瀏覽器的 YouTube 登入狀態」改回「不使用」。"),
-        "ja": ("{browser} の YouTube ログインを読み取れませんでした",
-               "{browser} がインストールされ YouTube にログインしていることを確認し、ブラウザを閉じてから再試行してください。"
-               "Windows の Chrome・Edge・Brave は Cookie を暗号化しているため通常は読み取れません。Firefox が最も確実です。"
-               "または拡張機能の設定の「ブラウザの YouTube ログインを使う」を「使わない」に戻してください。"),
-        "ko": ("{browser} 브라우저의 YouTube 로그인 정보를 읽지 못했습니다",
-               "{browser} 브라우저가 설치되어 있고 YouTube에 로그인되어 있는지 확인한 뒤, 브라우저를 닫고 다시 시도하세요. "
-               "Windows의 Chrome, Edge, Brave는 쿠키를 암호화하므로 보통 읽을 수 없습니다. Firefox가 가장 확실합니다. "
-               "또는 이 확장 프로그램 설정의 “브라우저의 YouTube 로그인 사용”을 “사용 안 함”으로 되돌리세요."),
+    "signin-needed": {
+        "en": ("YouTube asked to confirm you’re not a bot",
+               "Downloading without a sign-in was blocked. Sign in with a secondary account and try again, or try "
+               "another network later."),
+        "zh-TW": ("YouTube 要求確認你不是機器人",
+                  "不登入下載被擋下了。請用另外申請的小帳號登入後再試，或稍後換個網路。"),
+        "ja": ("YouTube がボットではないことの確認を求めています",
+               "ログインなしのダウンロードがブロックされました。サブアカウントでログインしてもう一度試すか、後で別の"
+               "ネットワークで試してください。"),
+        "ko": ("YouTube에서 로봇이 아닌지 확인을 요청했습니다",
+               "로그인 없이 다운로드가 차단되었습니다. 보조 계정으로 로그인한 뒤 다시 시도하거나, 나중에 다른 네트워크에서 "
+               "시도하세요."),
     },
-    "cookies-mac": {
-        "en": ("Couldn’t read your YouTube sign-in from {browser}",
-               "Make sure {browser} is installed and signed in to YouTube, close it and retry. For Chrome, Edge and "
-               "Brave, macOS asks to let “security” use the browser’s “Safe Storage” item in your keychain: enter "
-               "your Mac password and choose Allow. Or set this extension’s “Use my YouTube sign-in from a browser” back to “Don’t use”."),
-        "zh-TW": ("讀不到 {browser} 的 YouTube 登入狀態",
-                  "請確認已安裝 {browser} 並登入 YouTube，關閉瀏覽器後再重試。Chrome、Edge、Brave 的話，macOS 會詢問是否允許"
-                  "「security」使用鑰匙圈裡該瀏覽器的「Safe Storage」項目，請輸入 Mac 密碼並選擇「允許」。也可以把擴充功能設定的「使用瀏覽器的 YouTube 登入狀態」改回「不使用」。"),
-        "ja": ("{browser} の YouTube ログインを読み取れませんでした",
-               "{browser} がインストールされ YouTube にログインしていることを確認し、ブラウザを閉じてから再試行してください。"
-               "Chrome・Edge・Brave では、キーチェーンにあるブラウザの「Safe Storage」項目を「security」が使うことを macOS が確認するので、"
-               "Mac のパスワードを入力して「許可」を選んでください。"
-               "または拡張機能の設定の「ブラウザの YouTube ログインを使う」を「使わない」に戻してください。"),
-        "ko": ("{browser} 브라우저의 YouTube 로그인 정보를 읽지 못했습니다",
-               "{browser} 브라우저가 설치되어 있고 YouTube에 로그인되어 있는지 확인한 뒤, 브라우저를 닫고 다시 시도하세요. "
-               "Chrome, Edge, Brave의 경우 키체인에 있는 브라우저의 “Safe Storage” 항목을 “security”가 사용하도록 허용할지 "
-               "macOS가 묻습니다. Mac 암호를 입력하고 “허용”을 선택하세요. "
-               "또는 이 확장 프로그램 설정의 “브라우저의 YouTube 로그인 사용”을 “사용 안 함”으로 되돌리세요."),
+    "signin-expired": {
+        "en": ("Your saved YouTube sign-in no longer works", "Sign in again, then try again."),
+        "zh-TW": ("已保存的 YouTube 登入已失效", "請重新登入後再試。"),
+        "ja": ("保存された YouTube のログインが無効になりました", "もう一度ログインしてから再試行してください。"),
+        "ko": ("저장된 YouTube 로그인이 더 이상 작동하지 않습니다", "다시 로그인한 뒤 다시 시도하세요."),
     },
-    "cookiefile": {
-        "en": ("Couldn’t read the cookies.txt file",
-               "Check the path in this extension’s settings: it must be a cookies.txt in Netscape format, exported "
-               "from a browser that is signed in to YouTube. Or clear the setting."),
-        "zh-TW": ("讀不到 cookies.txt 檔案",
-                  "請檢查擴充功能設定裡的路徑：必須是從已登入 YouTube 的瀏覽器匯出的 cookies.txt（Netscape 格式）。或把設定清空。"),
-        "ja": ("cookies.txt ファイルを読み取れませんでした",
-               "拡張機能の設定のパスを確認してください。YouTube にログインしたブラウザから書き出した cookies.txt"
-               "（Netscape 形式）である必要があります。または設定を空にしてください。"),
-        "ko": ("cookies.txt 파일을 읽지 못했습니다",
-               "이 확장 프로그램 설정의 경로를 확인하세요. YouTube에 로그인된 브라우저에서 내보낸 cookies.txt"
-               "(Netscape 형식)여야 합니다. 또는 설정을 비우세요."),
+    # apps without action buttons: the import opens the sign-in window itself
+    "signin-expired-import": {
+        "en": ("Your saved YouTube sign-in no longer works",
+               "Import again: the sign-in window opens again (the warning first), where you can sign in again."),
+        "zh-TW": ("已保存的 YouTube 登入已失效", "請再匯入一次，會重新開啟登入視窗（先顯示警告），在裡面重新登入即可。"),
+        "ja": ("保存された YouTube のログインが無効になりました",
+               "もう一度取り込んでください。ログインウィンドウが再び開く（最初に警告が表示されます）ので、そこで"
+               "ログインし直せます。"),
+        "ko": ("저장된 YouTube 로그인이 더 이상 작동하지 않습니다",
+               "다시 가져오세요. 로그인 창이 다시 열리며(먼저 경고가 표시됨), 거기서 다시 로그인할 수 있습니다."),
     },
     "signin-browser": {
-        "en": ("Couldn’t find Chrome or Edge to sign in to YouTube",
-               "“Sign in to YouTube in a separate window” needs Google Chrome or Microsoft Edge. Install one, or turn "
-               "that setting off in this extension’s settings and use Firefox or a cookies.txt instead."),
-        "zh-TW": ("找不到可以登入 YouTube 的 Chrome 或 Edge",
-                  "「在獨立視窗登入 YouTube」需要 Google Chrome 或 Microsoft Edge。請安裝其中一個，"
-                  "或到擴充功能設定關閉這個選項，改用 Firefox 或 cookies.txt。"),
-        "ja": ("YouTube にログインするための Chrome や Edge が見つかりません",
-               "「別ウィンドウで YouTube にログイン」には Google Chrome か Microsoft Edge が必要です。どちらかをインストールするか、"
-               "拡張機能の設定でこの項目をオフにして、Firefox か cookies.txt を使ってください。"),
-        "ko": ("YouTube에 로그인할 Chrome 또는 Edge를 찾지 못했습니다",
-               "“별도 창에서 YouTube 로그인”에는 Google Chrome 또는 Microsoft Edge가 필요합니다. 둘 중 하나를 설치하거나, "
-               "이 확장 프로그램 설정에서 이 항목을 끄고 Firefox나 cookies.txt를 사용하세요."),
+        "en": ("Signing in to YouTube needs Chrome or Edge",
+               "Install Google Chrome or Microsoft Edge and try again, or try another network later."),
+        "zh-TW": ("登入 YouTube 需要 Chrome 或 Edge",
+                  "請安裝 Google Chrome 或 Microsoft Edge 後再試，或稍後換個網路。"),
+        "ja": ("YouTube へのログインには Chrome か Edge が必要です",
+               "Google Chrome か Microsoft Edge をインストールしてもう一度試すか、後で別のネットワークで試してください。"),
+        "ko": ("YouTube 로그인에는 Chrome 또는 Edge가 필요합니다",
+               "Google Chrome 또는 Microsoft Edge를 설치한 뒤 다시 시도하거나, 나중에 다른 네트워크에서 시도하세요."),
     },
     "signin-closed": {
         "en": ("YouTube sign-in was cancelled",
-               "The sign-in window was closed before you signed in to YouTube. Import again to open it again, or turn "
-               "off “Sign in to YouTube in a separate window” in this extension’s settings."),
-        "zh-TW": ("YouTube 登入已取消",
-                  "登入視窗在登入 YouTube 之前就被關閉了。再匯入一次會重新開啟登入視窗，"
-                  "或到擴充功能設定關閉「在獨立視窗登入 YouTube」。"),
+               "The sign-in window was closed before you signed in. Try again whenever you like."),
+        "zh-TW": ("YouTube 登入已取消", "登入視窗在登入前就被關閉了，需要時可以再試一次。"),
         "ja": ("YouTube へのログインがキャンセルされました",
-               "YouTube にログインする前にログインウィンドウが閉じられました。もう一度取り込むとログインウィンドウが開きます。"
-               "または拡張機能の設定で「別ウィンドウで YouTube にログイン」をオフにしてください。"),
-        "ko": ("YouTube 로그인이 취소되었습니다",
-               "YouTube에 로그인하기 전에 로그인 창이 닫혔습니다. 다시 가져오면 로그인 창이 다시 열립니다. "
-               "또는 이 확장 프로그램 설정에서 “별도 창에서 YouTube 로그인”을 끄세요."),
+               "ログインする前にログインウィンドウが閉じられました。必要なときにもう一度試してください。"),
+        "ko": ("YouTube 로그인이 취소되었습니다", "로그인하기 전에 로그인 창이 닫혔습니다. 필요할 때 다시 시도하세요."),
     },
     "signin-timeout": {
         "en": ("YouTube sign-in took too long",
-               "Nobody signed in to YouTube in the sign-in window within 15 minutes, so it was closed. Import again "
-               "to open it again."),
-        "zh-TW": ("YouTube 登入等太久了",
-                  "15 分鐘內沒有在登入視窗登入 YouTube，所以視窗已關閉。再匯入一次會重新開啟。"),
+               "Nobody signed in to YouTube in the sign-in window within 15 minutes, so it was closed. Try again "
+               "whenever you like."),
+        "zh-TW": ("YouTube 登入等太久了", "15 分鐘內沒有在登入視窗登入 YouTube，所以視窗已關閉。需要時再試一次即可。"),
         "ja": ("YouTube へのログインに時間がかかりすぎました",
                "15 分以内にログインウィンドウで YouTube にログインされなかったため、ウィンドウを閉じました。"
-               "もう一度取り込むと再び開きます。"),
+               "必要なときにもう一度試してください。"),
         "ko": ("YouTube 로그인 대기 시간이 초과되었습니다",
-               "15분 안에 로그인 창에서 YouTube에 로그인하지 않아 창을 닫았습니다. 다시 가져오면 다시 열립니다."),
+               "15분 안에 로그인 창에서 YouTube에 로그인하지 않아 창을 닫았습니다. 필요할 때 다시 시도하세요."),
     },
     "signin-failed": {
-        "en": ("Couldn’t open the YouTube sign-in window",
-               "{browser} didn’t start for signing in. Retry the import, or turn off “Sign in to YouTube in a "
-               "separate window” in this extension’s settings."),
-        "zh-TW": ("無法開啟 YouTube 登入視窗",
-                  "{browser} 沒有成功啟動來登入。請再匯入一次，或到擴充功能設定關閉「在獨立視窗登入 YouTube」。"),
-        "ja": ("YouTube のログインウィンドウを開けませんでした",
-               "ログイン用に {browser} を起動できませんでした。もう一度取り込むか、拡張機能の設定で"
-               "「別ウィンドウで YouTube にログイン」をオフにしてください。"),
-        "ko": ("YouTube 로그인 창을 열지 못했습니다",
-               "로그인을 위해 {browser} 브라우저를 시작하지 못했습니다. 다시 가져오거나, 이 확장 프로그램 설정에서 "
-               "“별도 창에서 YouTube 로그인”을 끄세요."),
+        "en": ("Couldn’t open the YouTube sign-in window", "{browser} didn’t start for signing in. Try again."),
+        "zh-TW": ("無法開啟 YouTube 登入視窗", "{browser} 沒有成功啟動來登入，請再試一次。"),
+        "ja": ("YouTube のログインウィンドウを開けませんでした", "ログイン用に {browser} を起動できませんでした。もう一度試してください。"),
+        "ko": ("YouTube 로그인 창을 열지 못했습니다", "로그인을 위해 {browser} 브라우저를 시작하지 못했습니다. 다시 시도하세요."),
     },
     "account-cap": {
         "en": ("Reached today’s {cap} downloads with your YouTube sign-in",
@@ -571,105 +531,42 @@ MESSAGES: Dict[str, Dict[str, Tuple[str, str]]] = {
     },
 }
 
-# What works against a bot check that doesn't pass, on this computer: the user's own YouTube sign-in (Firefox, or a
-# cookies.txt on Windows, where yt-dlp can't read Chrome's and Edge's encrypted cookies), another network, or time.
+# What else works against a bot check that doesn't pass (the sign-in is offered as the error's action)
 BLOCKED_HINTS: Dict[str, Dict[str, str]] = {
-    "signin": {
-        "en": "Turn on “Sign in to YouTube in a separate window” in this extension’s settings: when an import is "
-              "blocked without it, {chromium} opens with a profile of its own, separate from your usual one, where you "
-              "sign in to YouTube yourself. {main}",
-        "zh-TW": "到擴充功能設定開啟「在獨立視窗登入 YouTube」：不登入匯入被擋下時，會用獨立的設定檔開啟 {chromium}"
-                 "（和你平常用的分開），請自己在裡面登入 YouTube。{main}",
-        "ja": "拡張機能の設定で「別ウィンドウで YouTube にログイン」をオンにしてください。ログインなしの取り込みが"
-              "ブロックされたとき、普段とは別の専用プロファイルで {chromium} が開くので、そこでご自身で YouTube に"
-              "ログインします。{main}",
-        "ko": "이 확장 프로그램 설정에서 “별도 창에서 YouTube 로그인”을 켜세요. 로그인 없이 가져오기가 차단되면 평소 "
-              "프로필과 분리된 전용 프로필로 {chromium} 브라우저가 열리며, 거기서 직접 YouTube에 로그인하면 됩니다. {main}",
-    },
-    "signin-expired": {
-        "en": "This used the YouTube sign-in from the extension’s sign-in window, and YouTube didn’t accept it: it may "
-              "have expired, or YouTube may be restricting that account. The next import YouTube blocks opens the sign-in window "
-              "again; check you’re signed in there, or sign in with another secondary account. Turning “Sign in to "
-              "YouTube in a separate window” off signs out.",
-        "zh-TW": "這次用的是擴充功能登入視窗裡的 YouTube 登入狀態，但 YouTube 不接受：可能已經過期，或 YouTube 正在限制這個帳號。"
-                 "下次匯入被擋時會再開啟登入視窗，請確認裡面仍是登入狀態，或改用另一個次要帳號登入。"
-                 "關閉「在獨立視窗登入 YouTube」即可登出。",
-        "ja": "拡張機能のログインウィンドウでの YouTube ログインを使いましたが、YouTube に受け付けられませんでした。"
-              "期限切れか、YouTube がそのアカウントを制限している可能性があります。次にブロックされた取り込みでログインウィンドウが"
-              "再び開くので、ログインしたままか確認するか、別のサブアカウントでログインしてください。"
-              "「別ウィンドウで YouTube にログイン」をオフにするとログアウトします。",
-        "ko": "이번에는 확장 프로그램 로그인 창의 YouTube 로그인을 사용했지만 YouTube에서 받아들이지 않았습니다. 만료되었거나 "
-              "YouTube가 해당 계정을 제한하고 있을 수 있습니다. 다음에 가져오기가 차단되면 로그인 창이 다시 열리니, 로그인 상태인지 "
-              "확인하거나 다른 보조 계정으로 로그인하세요. “별도 창에서 YouTube 로그인”을 끄면 로그아웃됩니다.",
-    },
-    "firefox": {
-        "en": "Firefox is installed: sign in to YouTube in Firefox, then in this extension’s settings set “Use my "
-              "YouTube sign-in from a browser” to Firefox and retry.",
-        "zh-TW": "這台電腦有安裝 Firefox：在 Firefox 登入 YouTube，然後到擴充功能頁的 YouTube 設定，"
-                 "把「使用瀏覽器的 YouTube 登入狀態」設為 Firefox，再重試。",
-        "ja": "Firefox がインストールされています。Firefox で YouTube にログインし、拡張機能ページの YouTube の設定で"
-              "「ブラウザの YouTube ログインを使う」を Firefox にしてから再試行してください。",
-        "ko": "Firefox가 설치되어 있습니다. Firefox에서 YouTube에 로그인한 뒤, 확장 프로그램 페이지의 YouTube 설정에서 "
-              "“브라우저의 YouTube 로그인 사용”을 Firefox로 설정하고 다시 시도하세요.",
-    },
-    "cookies-txt": {
-        "en": "Chrome and Edge can’t be used for this on Windows: they encrypt their cookies. Instead, open a private "
-              "window, sign in to YouTube, export its cookies to a cookies.txt with a browser extension (see “Exporting "
-              "YouTube cookies” in yt-dlp’s wiki), close the window, and enter the file’s full path under “Or a "
-              "cookies.txt file” in this extension’s settings. Installing Firefox and choosing it under “Use my "
-              "YouTube sign-in from a browser” works too.",
-        "zh-TW": "Windows 上的 Chrome、Edge 會加密 Cookie，無法用在這裡。請改為開一個無痕視窗登入 YouTube，"
-                 "用瀏覽器擴充功能把 Cookie 匯出成 cookies.txt（做法見 yt-dlp wiki 的「Exporting YouTube cookies」），"
-                 "關閉無痕視窗後，把檔案的完整路徑填到擴充功能設定的「或使用 cookies.txt 檔案」。"
-                 "也可以安裝 Firefox，在「使用瀏覽器的 YouTube 登入狀態」選擇它。",
-        "ja": "Windows の Chrome・Edge は Cookie を暗号化しているため使えません。代わりにプライベートウィンドウで "
-              "YouTube にログインし、ブラウザ拡張機能で Cookie を cookies.txt に書き出して（yt-dlp の wiki の"
-              "「Exporting YouTube cookies」を参照）ウィンドウを閉じ、ファイルのフルパスを拡張機能の設定の"
-              "「または cookies.txt ファイル」に入力してください。Firefox をインストールして"
-              "「ブラウザの YouTube ログインを使う」で選ぶこともできます。",
-        "ko": "Windows의 Chrome과 Edge는 쿠키를 암호화하므로 여기에 사용할 수 없습니다. 대신 시크릿 창에서 YouTube에 "
-              "로그인하고, 브라우저 확장 프로그램으로 쿠키를 cookies.txt로 내보낸 뒤(yt-dlp 위키의 “Exporting YouTube "
-              "cookies” 참고) 창을 닫고, 파일의 전체 경로를 이 확장 프로그램 설정의 “또는 cookies.txt 파일”에 입력하세요. "
-              "Firefox를 설치해 “브라우저의 YouTube 로그인 사용”에서 선택해도 됩니다.",
-    },
-    "browser": {
-        "en": "In this extension’s settings, set “Use my YouTube sign-in from a browser” to a browser you’re signed in "
-              "to YouTube with, then retry.",
-        "zh-TW": "到擴充功能頁的 YouTube 設定，把「使用瀏覽器的 YouTube 登入狀態」設為你已登入 YouTube 的瀏覽器，再重試。",
-        "ja": "拡張機能ページの YouTube の設定で「ブラウザの YouTube ログインを使う」を、YouTube にログインしている"
-              "ブラウザにしてから再試行してください。",
-        "ko": "확장 프로그램 페이지의 YouTube 설정에서 “브라우저의 YouTube 로그인 사용”을 YouTube에 로그인된 브라우저로 "
-              "설정하고 다시 시도하세요.",
-    },
-    "signed-in-browser": {
-        "en": "This already uses your YouTube sign-in from {browser}: open YouTube in {browser} to check you’re still "
-              "signed in, then retry.",
-        "zh-TW": "目前已經使用 {browser} 的 YouTube 登入狀態：請在 {browser} 開啟 YouTube 確認仍是登入狀態，再重試。",
-        "ja": "すでに {browser} の YouTube ログインを使っています。{browser} で YouTube を開いてログインしたままか"
-              "確認してから再試行してください。",
-        "ko": "이미 {browser} 브라우저의 YouTube 로그인을 사용하고 있습니다. {browser}에서 YouTube를 열어 로그인 상태인지 "
-              "확인한 뒤 다시 시도하세요.",
-    },
-    "signed-in-file": {
-        "en": "This already uses your cookies.txt, which may have expired: export a fresh one (see “Exporting YouTube "
-              "cookies” in yt-dlp’s wiki), then retry.",
-        "zh-TW": "目前已經使用 cookies.txt，它可能已經過期：請重新匯出一份（做法見 yt-dlp wiki 的「Exporting YouTube cookies」），再重試。",
-        "ja": "すでに cookies.txt を使っていますが、期限切れの可能性があります。書き出し直して（yt-dlp の wiki の"
-              "「Exporting YouTube cookies」を参照）から再試行してください。",
-        "ko": "이미 cookies.txt를 사용하고 있지만 만료되었을 수 있습니다. 새로 내보낸 뒤(yt-dlp 위키의 “Exporting YouTube "
-              "cookies” 참고) 다시 시도하세요.",
-    },
     "network": {
-        "en": "Or switch to another network (a phone hotspot), turn off any VPN or proxy, or wait a few hours.",
-        "zh-TW": "或者換一個網路（例如手機熱點）、關閉 VPN 或 Proxy，或等幾個小時再試。",
-        "ja": "または別のネットワーク（スマホのテザリングなど）に切り替える、VPN やプロキシをオフにする、数時間待つ、"
+        "en": "Switch to another network (a phone hotspot), turn off any VPN or proxy, or wait a few hours.",
+        "zh-TW": "請換一個網路（例如手機熱點）、關閉 VPN 或 Proxy，或等幾個小時再試。",
+        "ja": "別のネットワーク（スマホのテザリングなど）に切り替える、VPN やプロキシをオフにする、数時間待つ、"
               "のいずれかを試してください。",
-        "ko": "또는 다른 네트워크(휴대폰 핫스팟 등)로 바꾸거나, VPN이나 프록시를 끄거나, 몇 시간 기다려 보세요.",
+        "ko": "다른 네트워크(휴대폰 핫스팟 등)로 바꾸거나, VPN이나 프록시를 끄거나, 몇 시간 기다려 보세요.",
     },
+}
+
+# the error's action: a button in the import panel (apps with features ["actions"])
+ACTION_SIGNIN: Dict[str, Tuple[str, str]] = {  # label, hint
+    "en": ("Sign in in a browser window, then try again",
+           "A separate window opens for you to sign in to YouTube. Use a secondary account, not your main one."),
+    "zh-TW": ("開啟網頁登入後再次嘗試", "會開啟一個獨立視窗讓你登入 YouTube，請用另外申請的小帳號，不要用主帳號。"),
+    "ja": ("ブラウザでログインしてからもう一度試す",
+           "YouTube にログインするための別ウィンドウが開きます。メインではなく、別に作成したサブアカウントを使ってください。"),
+    "ko": ("브라우저에서 로그인한 뒤 다시 시도",
+           "YouTube에 로그인할 별도 창이 열립니다. 주 계정이 아닌 별도로 만든 보조 계정을 사용하세요."),
 }
 
 # progress messages, shown by the app while an import runs
 PROGRESS: Dict[str, Dict[str, str]] = {
+    "signin-done": {
+        "en": "Signed in to YouTube.",
+        "zh-TW": "已登入 YouTube。",
+        "ja": "YouTube にログインしました。",
+        "ko": "YouTube에 로그인했습니다.",
+    },
+    "signout-done": {
+        "en": "Signed out of YouTube; the sign-in window’s profile was deleted.",
+        "zh-TW": "已登出 YouTube，並刪除登入視窗的設定檔。",
+        "ja": "YouTube からログアウトし、ログインウィンドウのプロファイルを削除しました。",
+        "ko": "YouTube에서 로그아웃하고 로그인 창의 프로필을 삭제했습니다.",
+    },
     "account-try": {
         "en": "Blocked without a sign-in; trying once with your YouTube sign-in…",
         "zh-TW": "不登入時被擋下，改用你的 YouTube 登入狀態試一次…",
@@ -724,8 +621,9 @@ PROGRESS: Dict[str, Dict[str, str]] = {
 }
 
 _KINDS: List[Tuple[str, Tuple[str, ...]]] = [
-    ("cookies", ("cookieloaderror", "failed to decrypt with dpapi", "cookies database", "cookie database",
-                 "failed to load cookies", "netscape format cookies file")),
+    # the sign-in's own cookies.txt (handled as an expired sign-in)
+    ("cookies", ("cookieloaderror", "cookies database", "cookie database", "failed to load cookies",
+                 "netscape format cookies file")),
     ("blocked", ("not a bot",)),
     ("changed", ("requested format is not available", "signature extraction failed", "nsig extraction failed",
                  "only images are available", "http error 403")),
@@ -776,35 +674,9 @@ def _text(key: str, **fmt: Any) -> str:
     return PROGRESS[key][_lang()].format(**fmt)
 
 
-def _firefox_found() -> bool:
-    """Whether Firefox is installed with a profile yt-dlp could read (only looks for the files, reads nothing)."""
-    if sys.platform == "win32":
-        places = [os.path.join(os.environ.get("APPDATA", ""), "Mozilla", "Firefox")]
-    elif sys.platform == "darwin":
-        places = [os.path.expanduser("~/Library/Application Support/Firefox")]
-    else:
-        places = [os.path.expanduser("~/.mozilla/firefox"), os.path.expanduser("~/snap/firefox/common/.mozilla/firefox")]
-    for place in places:
-        profiles = glob.glob(os.path.join(place, "*", "cookies.sqlite")) + glob.glob(
-            os.path.join(place, "Profiles", "*", "cookies.sqlite"))
-        if os.path.isfile(os.path.join(place, "profiles.ini")) and profiles:
-            return True
-    return False
-
-
-def _blocked_hints(signed_in: bool = False) -> List[str]:
-    """Which BLOCKED_HINTS apply on this computer, with these settings (`signed_in`: the sign-in window's)."""
-    if _settings.get("cookiesFromBrowser") in BROWSERS:
-        hints = ["signed-in-browser"]
-    elif str(_settings.get("cookiesFile") or "").strip():
-        hints = ["signed-in-file"]
-    elif signed_in:
-        hints = ["signin-expired"]
-    else:
-        hints = (["signin"] if _chromium() else []) + (["firefox"] if _firefox_found() else [])
-        if not hints:
-            hints = ["cookies-txt"] if sys.platform == "win32" else ["browser"]  # macOS / Linux read Chrome too
-    return hints + ["network"]
+def _host_has_actions() -> bool:
+    """The app shows an error's `action` as a button and calls action() (context["features"])."""
+    return "actions" in (_context.get("features") or [])
 
 
 def error_kind(exc: BaseException) -> Optional[str]:
@@ -815,25 +687,22 @@ def error_kind(exc: BaseException) -> Optional[str]:
     return None
 
 
-def readable_error(kind: str, exc: BaseException, again: bool = False, signed_in: bool = False,
-                   browser: Optional[str] = None, extra: Optional[Dict[str, Any]] = None) -> YouTubeError:
-    browser = browser or BROWSERS.get(str(_settings.get("cookiesFromBrowser")))
+def readable_error(kind: str, exc: BaseException, again: bool = False, browser: Optional[str] = None,
+                   extra: Optional[Dict[str, Any]] = None, action: Optional[str] = None) -> YouTubeError:
+    """`action`: the error's action for the import panel (see "Actions")."""
     lang = _lang()
-    if kind == "cookies" and not browser:
-        kind = "cookiefile"
-    elif kind == "cookies" and sys.platform == "darwin":
-        kind = "cookies-mac"  # no DPAPI there: the keychain holds Chromium's cookie key
     title, body = MESSAGES["blocked-again" if kind == "blocked" and again else kind][lang]
     if kind == "blocked":
         # Chinese and Japanese sentences follow each other without a space
-        body = ("" if lang in ("zh-TW", "ja") else " ").join([body] + [BLOCKED_HINTS[h][lang] for h in _blocked_hints(signed_in)])
-    fmt = {"browser": browser or "", "version": _active_version() or "?",
-           "chromium": (_chromium() or ("Chrome",))[0] if kind == "blocked" else "", "main": MAIN_ACCOUNT[lang],
-           **(extra or {})}
+        body = ("" if lang in ("zh-TW", "ja") else " ").join([body, BLOCKED_HINTS["network"][lang]])
+    fmt = {"browser": browser or "", "version": _active_version() or "?", "main": MAIN_ACCOUNT[lang], **(extra or {})}
     # a subclass named after the title, so the app's "<class>: <message>" reads as a sentence
     cls = type(title.format(**fmt), (YouTubeError,), {})
     err = cls(body.format(**fmt))
     err.kind = kind  # type: ignore[attr-defined]
+    if action == "signin":
+        label, hint = ACTION_SIGNIN[lang]
+        err.action = {"id": "signin", "label": label, "hint": hint}  # type: ignore[attr-defined]
     err.__cause__ = exc
     return err
 
@@ -841,8 +710,9 @@ def readable_error(kind: str, exc: BaseException, again: bool = False, signed_in
 # ---------------------------------------------------------------------------
 # Sign-in in a window of its own
 #
-# With the "signIn" setting on, an import blocked without a sign-in opens Chrome (or Edge) with a profile that belongs
-# to the extension (<dataDir>/signin/profile, never the user's usual profile). It first shows a warning page, served on 127.0.0.1 by
+# When an import is blocked without a sign-in, the import panel offers "sign in" (the error's action; in apps
+# without actions the import does it itself). It opens Chrome (or Edge) with a profile that belongs to the extension
+# (<dataDir>/signin/profile, never the user's usual profile). It first shows a warning page, served on 127.0.0.1 by
 # the extension, that the user must accept (a checkbox: "I'm using a secondary account, not my main one") before it
 # goes on to YouTube's sign-in page; closing the window cancels. The user signs in there themselves; the extension
 # waits until youtube.com has a signed-in session, asks the browser for its youtube.com / google.com cookies over the
@@ -851,10 +721,9 @@ def readable_error(kind: str, exc: BaseException, again: bool = False, signed_in
 #
 # yt-dlp then downloads as that account and saves the cookies YouTube refreshes back to the file (through a copy that
 # replaces it in one step), so the sign-in lasts across imports, app restarts and extension updates (the app keeps
-# dataDir). When YouTube stops accepting it, the next blocked import opens the window again (warning first); the kept
-# profile is usually still signed in, so no password is needed. Only turning the setting off (sign-out) deletes
-# the profile and the file. Cookie values are never logged or put in messages.
-# The user's own cookies.txt or browser setting wins over this sign-in.
+# dataDir). When YouTube stops accepting it, the error offers the sign-in again (warning first); the kept profile is
+# usually still signed in, so no password is needed. Only sign-out (the "signout" action) deletes the profile and
+# the file. Cookie values are never logged or put in messages.
 # ---------------------------------------------------------------------------
 
 SIGNIN_URL = "https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fwww.youtube.com%2F"
@@ -988,12 +857,6 @@ def _signin_cookies() -> Optional[str]:
     folder = _signin_dir()
     path = os.path.join(folder, "cookies.txt") if folder else ""
     return path if path and os.path.isfile(path) else None
-
-
-def _own_cookies_set() -> bool:
-    """The user's own cookies.txt or browser setting, which win over the sign-in window."""
-    return str(_settings.get("cookiesFromBrowser") or "off") in BROWSERS or bool(
-        str(_settings.get("cookiesFile") or "").strip().strip('"'))
 
 
 def sign_out() -> None:
@@ -1306,16 +1169,20 @@ def _netscape(cookies: List[Dict[str, Any]]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def ensure_signin(progress: Optional[Callable[..., None]] = None,
-                  cancel: Optional[Callable[[], None]] = None) -> Optional[str]:
-    """With the signIn setting on and no working sign-in: open the sign-in window (the warning first) and wait for
-    the user. The cookies file (None: the setting is off, or the user's own cookies are set)."""
+def _signed_in_now() -> bool:
+    """A saved sign-in YouTube hasn't stopped accepting."""
+    return _signin_cookies() is not None and not os.path.exists(_refresh_marker())
+
+
+def ensure_signin(progress: Optional[Callable[..., None]] = None, cancel: Optional[Callable[[], None]] = None,
+                  force: bool = False) -> Optional[str]:
+    """Without a working sign-in (or with `force`): open the sign-in window (the warning first) and wait for the
+    user. The cookies file (None: no data folder)."""
     folder = _signin_dir()
-    if not _settings.get("signIn") or _own_cookies_set() or not folder:
+    if not folder:
         return None
-    existing = _signin_cookies()
-    if existing and not os.path.exists(_refresh_marker()):
-        return existing
+    if _signed_in_now() and not force:
+        return _signin_cookies()
     found = _chromium()
     if not found:
         raise readable_error("signin-browser", FileNotFoundError("Chrome / Edge"))
@@ -1493,15 +1360,8 @@ def _ydl(opts: Dict[str, Any], account: bool = False, logger: Any = None) -> Any
         # (a flat search never runs YouTube's player, so it doesn't look for one: searches stay fast)
         "js_runtimes": {"deno": {}, "node": {}, "bun": {}} if opts.get("extract_flat") else _js_runtimes(),
     }
-    browser = str(_settings.get("cookiesFromBrowser") or "off")
-    if browser in BROWSERS:
-        base["cookiesfrombrowser"] = (browser, None, None, None)
-    cookie_file = str(_settings.get("cookiesFile") or "").strip().strip('"')
-    if cookie_file:
-        if not os.path.isfile(cookie_file):
-            raise readable_error("cookiefile", FileNotFoundError(cookie_file))
-        base["cookiefile"] = cookie_file
-    elif account and browser not in BROWSERS:
+    # (settings from 1.0.2-1.0.4, cookiesFromBrowser and cookiesFile, are ignored: the sign-in window replaced them)
+    if account:
         work = _cookie_work_copy()
         base["cookiefile"] = work
         base["sleep_interval_requests"] = ACCOUNT_SLEEP_REQUESTS_SEC  # gently, one request at a time
@@ -1725,8 +1585,8 @@ class _AccountLog:
 
 
 def _account_on() -> bool:
-    """The sign-in window is on (and not overruled by the user's own cookies.txt or browser setting)."""
-    return bool(_settings.get("signIn")) and not _own_cookies_set() and bool(_context.get("dataDir"))
+    """A sign-in is possible: a data folder, and a saved sign-in or Chrome / Edge to make one."""
+    return bool(_context.get("dataDir")) and (_signin_cookies() is not None or _chromium() is not None)
 
 
 def _with_account(call_with: Callable[[bool, Any], Any], progress: Optional[Callable[..., None]],
@@ -1754,7 +1614,11 @@ def _with_account(call_with: Callable[[bool, Any], Any], progress: Optional[Call
             if not _ask_over_cap(progress, cancel):
                 raise readable_error("account-cap", cause, extra={"cap": ACCOUNT_DAILY_CAP}) from cause
             _save_account_state(dict(_account_state(), overCap=_today()))  # until local midnight
-        ensure_signin(progress, cancel)  # the sign-in window, when there's no working sign-in yet
+        if not _signed_in_now():
+            expired = _signin_cookies() is not None
+            if _host_has_actions():  # the import panel offers the sign-in; it retries the import afterwards
+                raise readable_error("signin-expired" if expired else "signin-needed", cause, action="signin") from cause
+            ensure_signin(progress, cancel)  # older apps: the import opens the sign-in window itself
         _count_account_use()
         if progress is not None:
             progress(None, _text("account-try"))
@@ -1774,11 +1638,13 @@ def _with_account(call_with: Callable[[bool, Any], Any], progress: Optional[Call
             except Exception as err:  # noqa: BLE001
                 exc = err
             low = str(exc).lower()
-            if log.says(ACCOUNT_EXPIRED):
-                # not the account's fault: the next import opens the window again (the profile usually still signed in)
+            if log.says(ACCOUNT_EXPIRED) or error_kind(exc) == "cookies":
+                # not the account's fault: signing in again (the profile is usually still signed in) fixes it
                 with open(_refresh_marker(), "w", encoding="utf-8"):
                     pass
-                raise readable_error("blocked", exc, signed_in=True) from exc
+                if _host_has_actions():
+                    raise readable_error("signin-expired", exc, action="signin") from exc
+                raise readable_error("signin-expired-import", exc) from exc
             if any(k in low for k in ACCOUNT_TROUBLE) or log.says(ACCOUNT_TROUBLE):
                 break
             if error_kind(exc) != "blocked":
@@ -1797,7 +1663,7 @@ def _with_account(call_with: Callable[[bool, Any], Any], progress: Optional[Call
 
 def _download(call_with: Callable[[bool, Any], Any], progress: Optional[Callable[..., None]],
               cancel: Optional[Callable[[], None]], key: str) -> Any:
-    """An import: anonymous first; with the sign-in window on, a bot check goes on to the account."""
+    """An import: anonymous first; a bot check goes on to the account (signing in first when there's none)."""
     if not _account_on():
         return _run(lambda: call_with(False, None), progress, update=True, cancel=cancel, key=key)
     try:
@@ -1806,6 +1672,32 @@ def _download(call_with: Callable[[bool, Any], Any], progress: Optional[Callable
         if getattr(err, "kind", None) != "blocked":
             raise
         return _with_account(call_with, progress, cancel, err)
+
+
+# ---------------------------------------------------------------------------
+# Actions
+#
+# Apps with context["features"] containing "actions" show an error's `action` ({id, label, hint}) as a button in the
+# import panel. Clicking it calls action(action_id, progress, cancel, options) in its own process (timeouts.action) and,
+# when it returns ok, retries the import. The manifest lists the ids under "actions" (a top-level key: older apps
+# reject unknown capabilities but ignore unknown keys).
+#   signin   the sign-in window (warning first): sign in, or sign in again when YouTube stopped accepting the saved one
+#   signout  delete the sign-in window's profile and the saved sign-in
+# ---------------------------------------------------------------------------
+
+
+def action(action_id: str, progress: Optional[Callable[..., None]] = None, cancel: Optional[Callable[[], None]] = None,
+           options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    if action_id == "signin":
+        try:
+            ensure_signin(progress, cancel, force=True)
+        except YouTubeError as err:
+            return {"ok": False, "message": f"{type(err).__name__}: {err}"}
+        return {"ok": True, "message": _text("signin-done")}
+    if action_id == "signout":
+        sign_out()
+        return {"ok": True, "message": _text("signout-done")}
+    raise ValueError(f"unknown action {action_id!r}")
 
 
 def _url(item_or_url: Any) -> str:

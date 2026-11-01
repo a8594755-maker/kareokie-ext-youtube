@@ -30,19 +30,16 @@ def flaky(failures, error=BLOCKED):
 
 class BotRetryTest(unittest.TestCase):
     def setUp(self):
-        self.saved = (main.BLOCKED_RETRY_DELAYS_SEC, main.BLOCKED_RETRY_DELAYS_QUICK_SEC, main.update_yt_dlp,
-                      main._firefox_found)
+        self.saved = (main.BLOCKED_RETRY_DELAYS_SEC, main.BLOCKED_RETRY_DELAYS_QUICK_SEC, main.update_yt_dlp)
         main.BLOCKED_RETRY_DELAYS_SEC = (0.01, 0.01, 0.01)
         main.BLOCKED_RETRY_DELAYS_QUICK_SEC = (0.01,)
         main.update_yt_dlp = lambda *a, **k: False  # no pip in tests
-        main._firefox_found = lambda: False
         self.chromium, main._chromium = main._chromium, lambda: None
         self.data = tempfile.TemporaryDirectory()
         main.setup({"settings": {}, "dataDir": self.data.name, "locale": "en"})
 
     def tearDown(self):
-        (main.BLOCKED_RETRY_DELAYS_SEC, main.BLOCKED_RETRY_DELAYS_QUICK_SEC, main.update_yt_dlp,
-         main._firefox_found) = self.saved
+        main.BLOCKED_RETRY_DELAYS_SEC, main.BLOCKED_RETRY_DELAYS_QUICK_SEC, main.update_yt_dlp = self.saved
         main._chromium = self.chromium
         self.data.cleanup()
 
@@ -126,18 +123,11 @@ class BotRetryTest(unittest.TestCase):
 
 
 class LanguageTest(unittest.TestCase):
-    def setUp(self):
-        self.saved = main._firefox_found
-        main._firefox_found = lambda: False
-        self.chromium, main._chromium = main._chromium, lambda: None
-
     def tearDown(self):
-        main._firefox_found = self.saved
-        main._chromium = self.chromium
         main.setup({"settings": {}})
 
-    def blocked(self, locale=None, **settings):
-        main.setup({"settings": settings, **({"locale": locale} if locale else {})})
+    def blocked(self, locale=None):
+        main.setup({"settings": {}, **({"locale": locale} if locale else {})})
         return main.readable_error("blocked", RuntimeError(BLOCKED))
 
     def test_app_locale_wins(self):
@@ -151,9 +141,12 @@ class LanguageTest(unittest.TestCase):
         self.assertIn(main._lang(), ("en", "zh-TW", "ja", "ko"))
 
     def test_every_message_in_every_language(self):
+        langs = {"en", "zh-TW", "ja", "ko"}
         for table in (main.MESSAGES, main.BLOCKED_HINTS, main.PROGRESS):
-            for key, texts in table.items():
-                self.assertEqual(set(texts), {"en", "zh-TW", "ja", "ko"}, key)
+            for key, by_lang in table.items():
+                self.assertEqual(set(by_lang), langs, key)
+        for by_lang in (main.ACTION_SIGNIN, main.WARNING_PAGE, main.CAP_PAGE, main.MAIN_ACCOUNT):
+            self.assertEqual(set(by_lang), langs)
 
     def test_retry_progress_follows_the_app(self):
         main.setup({"settings": {}, "locale": "zh-TW"})
@@ -164,63 +157,18 @@ class LanguageTest(unittest.TestCase):
     def test_blocked_message_in_the_app_language(self):
         err = self.blocked("zh-TW")
         self.assertEqual(type(err).__name__, "YouTube 要求確認你不是機器人")
-        self.assertIn("每次重試都被擋下", str(err))
-        self.assertIn("這樣做：Windows", str(err))  # no space between Chinese sentences
-        self.assertIn("選擇它。或者", str(err))
+        self.assertEqual(str(err), "每次重試都被擋下，再等一下也沒用。請換一個網路（例如手機熱點）、關閉 VPN 或 Proxy，或等幾個小時再試。")
         self.assertIn("기다려", str(self.blocked("ko")))
+        self.assertEqual(str(self.blocked("en")), "It kept asking on every try, so waiting a minute won’t help. Switch to "
+                         "another network (a phone hotspot), turn off any VPN or proxy, or wait a few hours.")
 
-    def test_blocked_without_firefox_on_windows_explains_cookies_txt(self):
-        text = str(self.blocked("en"))
-        if sys.platform == "win32":
-            self.assertIn("Chrome and Edge can’t be used", text)
-            self.assertIn("cookies.txt", text)
-        else:
-            self.assertIn("a browser you’re signed in", text)
-        self.assertIn("another network", text)
-
-    def test_blocked_with_chrome_or_edge_points_to_the_sign_in_window(self):
-        main._chromium = lambda: ("Edge", "msedge.exe")
-        text = str(self.blocked("en"))
-        self.assertIn("Turn on “Sign in to YouTube in a separate window”", text)
-        self.assertIn("Edge opens with a profile of its own", text)
-        self.assertIn("Don’t sign in with your main account", text)
-        self.assertNotIn("Chrome and Edge can’t be used", text)
-        self.assertIn("請勿登入主帳號：用帳號下載可能讓 YouTube 限制或停用該帳號", str(self.blocked("zh-TW")))
-
-    def test_blocked_with_firefox_points_to_the_setting(self):
-        main._firefox_found = lambda: True
-        text = str(self.blocked("en"))
-        self.assertIn("Firefox is installed", text)
-        self.assertNotIn("Chrome and Edge", text)
-
-    def test_blocked_while_signed_in(self):
-        self.assertIn("already uses your YouTube sign-in from Firefox", str(self.blocked("en", cookiesFromBrowser="firefox")))
-        self.assertIn("already uses your cookies.txt", str(self.blocked("en", cookiesFile="C:\\c.txt")))
-        self.assertIn("目前已經使用 Firefox", str(self.blocked("zh-TW", cookiesFromBrowser="firefox")))
-
-    def test_firefox_check_reads_no_cookies(self):
-        with tempfile.TemporaryDirectory() as home:
-            place = {"win32": os.path.join(home, "Mozilla", "Firefox"),
-                     "darwin": os.path.join(home, "Library", "Application Support", "Firefox")}.get(
-                sys.platform, os.path.join(home, ".mozilla", "firefox"))
-            env = {"APPDATA": home, "HOME": home, "USERPROFILE": home}
-            saved = {k: os.environ.get(k) for k in env}
-            os.environ.update(env)
-            try:
-                self.assertFalse(self.saved())
-                os.makedirs(os.path.join(place, "Profiles", "abc.default-release"))
-                with open(os.path.join(place, "profiles.ini"), "w"):
-                    pass
-                self.assertFalse(self.saved())  # a profile Firefox never used
-                with open(os.path.join(place, "Profiles", "abc.default-release", "cookies.sqlite"), "w"):
-                    pass
-                self.assertTrue(self.saved())
-            finally:
-                for k, v in saved.items():
-                    if v is None:
-                        os.environ.pop(k, None)
-                    else:
-                        os.environ[k] = v
+    def test_no_settings_left_to_point_to(self):
+        for lang in ("en", "zh-TW", "ja", "ko"):
+            for kind, texts in main.MESSAGES.items():
+                for text in texts[lang]:
+                    for gone in ("Use my YouTube sign-in", "使用瀏覽器的 YouTube 登入狀態", "cookies.txt ファイル",
+                                 "브라우저의 YouTube 로그인 사용", "separate window”", "在獨立視窗登入 YouTube」"):
+                        self.assertNotIn(gone, text, (kind, lang))
 
 
 if __name__ == "__main__":

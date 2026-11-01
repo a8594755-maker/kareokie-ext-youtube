@@ -2,38 +2,40 @@
 
 ## 1.0.5 — 2026-11-01
 
-- Messages follow the app's language: newer KAREOKIE versions pass it to extensions (`locale`: English,
-  Traditional Chinese, Japanese, Korean); older ones fall back to the system's display language as before. Korean
-  is new. The progress shown while an import waits out a bot check (and while yt-dlp updates) is translated too.
-- When YouTube's "confirm you're not a bot" check blocks every try, the error now says what works on this computer:
-  with Firefox installed, signing in to YouTube there and choosing it in the settings; on Windows without Firefox,
-  exporting a cookies.txt (Chrome and Edge encrypt their cookies, so yt-dlp can't use them there); when a sign-in is
-  already set, checking it or exporting a fresh cookies.txt; and another network or waiting. The Firefox check only
-  looks for its profile files and reads no cookies.
-- Some blocks don't pass: one video can be blocked on every try while others play from the same network. A video
-  blocked through every retry is remembered for 6 hours, and importing it again tries once and reports at once
-  instead of waiting about a minute. A successful import forgets it.
-- New setting "Sign in to YouTube in a separate window (Chrome / Edge)", off by default, with a prominent warning
-  not to use a main account (YouTube may restrict or disable accounts that download). The next import opens Chrome
-  (or Edge) with a profile of the extension's own, never the usual one. Every time, it first shows a red full-window
-  warning page (served on 127.0.0.1, in the app's language) whose Continue button stays disabled until the user
-  ticks "I understand the risk, and I'm using a separately created secondary account"; closing the window cancels.
-  Then the user signs in to YouTube themselves, and the extension takes that window's youtube.com / google.com
-  cookies over the browser's DevTools connection, saves them as a cookies.txt in its data folder, closes the window
-  and downloads as that account.
+- Sign in to YouTube from the import panel, with no setup. When YouTube's "confirm you're not a bot" check blocks
+  an import and no sign-in is saved, the error is short and in the app's language, and it comes with a button:
+  "Sign in in a browser window, then try again" (「開啟網頁登入後再次嘗試」), plus a one-line hint to use a
+  secondary account. The button opens Chrome (or Edge) with a profile of the extension's own, never the usual one.
+  Every time, the window first shows a red full-window warning, "Don't sign in with your main account" (YouTube may
+  restrict or disable accounts that download), served on 127.0.0.1 in the app's language. Its Continue button stays
+  disabled until the user ticks "I understand the risk, and I'm using a separately created secondary account";
+  closing the window cancels. The user then signs in themselves. The extension takes that window's youtube.com /
+  google.com cookies over the browser's DevTools connection, saves them as a cookies.txt in its data folder and
+  closes the window, and the app retries the import.
+- New extension method `action(action_id, progress, cancel, options)` with `signin` and `signout`. Apps that show
+  action buttons pass `context["features"] = ["actions"]`. The manifest lists the ids as a top-level `"actions"`
+  key (current apps reject unknown capabilities but ignore unknown keys), with `timeouts.action` = 900 s. Older
+  apps get the same sign-in from the import itself: a blocked import opens the sign-in window and goes on.
 - The sign-in is kept across imports, app restarts and extension updates; yt-dlp's refreshed cookies are saved back
   after every call through a copy that replaces the file in one step. When YouTube stops accepting it, the error
-  says so and the next import opens the window again (warning first; the kept profile is usually still signed in).
-  Only turning the setting off signs out (deletes the profile and the cookies). The user's own cookies.txt or
-  browser setting wins over it. The bot-check error points to it when Chrome or Edge is installed.
+  says so and offers the button again (the kept profile is usually still signed in, so no password is needed).
+  `signout` deletes the profile and the cookies.
 - The account is used as little and as gently as possible: searches, metadata, music videos and imports go
   without it, and only an import the bot check blocked without it is tried with it (at most one retry, 1.5 s
   between requests, one at a time). After 30 imports a day with it, the sign-in window asks: stop for today
   (recommended) or "I understand the risk, continue anyway", which holds until local midnight; closing the window
-  stops. If it is still blocked while signed
-  in, or YouTube reports account trouble (unusual traffic, too many requests, a suspended account), it isn't used
-  for 24 hours and the user is told to check the account and not to keep retrying. The warning page says use is
-  kept to a minimum but restriction can't be ruled out.
+  stops. If it is still blocked while signed in, or YouTube reports account trouble (unusual traffic, too many
+  requests, a suspended account), it isn't used for 24 hours, and the user is told to check the account and not
+  to keep retrying. The warning page says use is kept to a minimum but restriction can't be ruled out.
+- Removed the settings "Use my YouTube sign-in from a browser" and "Or a cookies.txt file"; values saved by 1.0.2-1.0.4
+  are ignored. A saved "Chrome" there used to fail every import with "Couldn't read your YouTube sign-in from
+  Chrome", which read like the extension couldn't open Chrome.
+- Messages follow the app's language: newer KAREOKIE versions pass it to extensions (`locale`: English,
+  Traditional Chinese, Japanese, Korean); older ones fall back to the system's display language as before. Korean
+  is new. Progress messages (bot-check waits, the sign-in, yt-dlp updates) are translated too.
+- Some blocks don't pass: one video can be blocked on every try while others play from the same network. Without
+  Chrome or Edge or a saved sign-in, a video blocked through every retry is remembered for 6 hours, and importing
+  it again tries once and reports at once instead of waiting about a minute.
 
 ## 1.0.4 — 2026-11-01
 

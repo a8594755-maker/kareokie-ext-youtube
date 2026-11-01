@@ -15,6 +15,7 @@ files; online sources like this one are separate extensions you choose to instal
 | `resolve` | the best audio stream as-is + the uploader's subtitles (used as lyrics candidates) |
 | `video` | the music video, video-only, up to the app's `videoQuality` height, AV1 > VP9 > H.264 (`video.mp4` / `video.webm`), downloaded while the app separates the audio |
 | `metadata` | title / artist / duration of a URL without downloading |
+| actions | `signin` / `signout`, offered on an error in the import panel (see "Sign-in window") |
 | URLs | `youtube.com/watch?v=…`, `youtu.be/…`, `/shorts/`, `/embed/`, `/live/`, `music.youtube.com` |
 
 Dependencies: [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense) and `yt-dlp-ejs`, installed by KAREOKIE
@@ -24,11 +25,11 @@ yt-dlp into the extension's data folder (`<dataDir>/yt-dlp/<version>/`); the new
 An error a newer yt-dlp may fix ("confirm you're not a bot", missing formats, HTTP 403) checks again sooner and
 retries the import once. A "confirm you're not a bot" check is often a passing flag on one request, so a
 blocked import also waits and tries again (after 5, 15 and 30 s; searches once, after 3 s) before it reports
-the error. That error says what works on this computer: a YouTube sign-in (the sign-in window below when Chrome or
-Edge is installed, Firefox when it is; otherwise a cookies.txt, since on Windows yt-dlp can't read Chrome's and
-Edge's encrypted cookies), another network, or waiting. Some blocks don't pass, so a video blocked through every retry is remembered for 6 hours and
-importing it again reports at once instead of waiting (`<dataDir>/blocked.json`). With a JavaScript runtime installed (deno, Node.js or Bun), yt-dlp solves YouTube's
-player challenges with it and finds every format.
+the error. When Chrome or Edge is installed (or a sign-in is saved), a blocked import skips those waits and goes
+on to the sign-in instead (see "Sign-in window"). Some blocks don't pass, so a video blocked through every retry is
+remembered for 6 hours and importing it again reports at once instead of waiting (`<dataDir>/blocked.json`). With a
+JavaScript runtime installed (deno, Node.js or Bun), yt-dlp solves YouTube's player challenges with it and finds
+every format.
 
 ### macOS (Apple Silicon)
 
@@ -42,9 +43,7 @@ The extension runs in KAREOKIE's own Python on the Mac too; nothing is Windows-o
   tried again 30 minutes later; yt-dlp works without a runtime meanwhile, with fewer formats.
 - **ffmpeg** isn't needed: audio and video are downloaded as-is. yt-dlp would find the app's bundled ffmpeg on the
   PATH the app gives the extension.
-- **Browser sign-in.** Firefox, Chrome, Edge and Brave work. For Chrome, Edge and Brave macOS asks once to let
-  `security` read the browser's "Safe Storage" keychain item. Safari isn't offered: its cookies need Full Disk
-  Access for KAREOKIE.
+- **Sign-in window.** Chrome or Edge from `/Applications` (or `~/Applications`), the same as on Windows.
 - With an app that doesn't pass its language, error messages follow the first of the Mac's preferred languages.
 
 ### Sign-in window
@@ -52,9 +51,12 @@ The extension runs in KAREOKIE's own Python on the Mac too; nothing is Windows-o
 > **Don't sign in with your main account.** Downloading with an account may make YouTube restrict or disable it.
 > Use a separately created secondary account.
 
-With "Sign in to YouTube in a separate window" on, an import YouTube blocks without a sign-in opens Chrome (or
-Edge) with a profile of the extension's own (`<dataDir>/signin/profile`, started with `--user-data-dir` and `--remote-debugging-port=0`; the
-user's usual profile is never touched).
+There's nothing to set up. When YouTube blocks an import without a sign-in and none is saved, the error in the
+import panel comes with a button, **Sign in in a browser window, then try again** (「開啟網頁登入後再次嘗試」), and a
+one-line hint to use a secondary account. The button calls the extension's `action("signin")`, which opens Chrome
+(or Edge) with a profile of the extension's own (`<dataDir>/signin/profile`, started with `--user-data-dir` and
+`--remote-debugging-port=0`; the user's usual profile is never touched). When it returns ok, the app retries the
+import, which then goes through the account (see below).
 
 1. **Warning first, every time.** The window opens on a full-window red warning page, served by the extension on
    `127.0.0.1` under a random path, in the app's language. Its Continue button stays disabled until the user ticks
@@ -69,9 +71,8 @@ user's usual profile is never touched).
 The sign-in is kept: yt-dlp downloads with it and saves the cookies YouTube refreshes back to it after every call
 (through a copy that replaces `cookies.txt` in one step, so a call killed mid-write can't break it). `dataDir`
 survives app restarts and extension updates, so there's no need to sign in again. When YouTube stops accepting it,
-the error says so and the next blocked import opens the window again (warning first); the kept profile is usually still
-signed in, so it just closes again with fresh cookies. Only turning the setting off (sign-out) deletes the profile
-and the cookies. Cookie values are never logged or put in messages, and only yt-dlp's requests to YouTube / Google
+the error says so and offers the button again (warning first); the kept profile is usually still signed in, so the
+window just closes again with fresh cookies. Only `action("signout")` deletes the profile and the cookies. Cookie values are never logged or put in messages, and only yt-dlp's requests to YouTube / Google
 use them.
 
 ### Using the account sparingly
@@ -95,6 +96,15 @@ and they can't guarantee the account won't be restricted.
 
 The counters live in `<dataDir>/account/usage.json`, which a sign-out keeps.
 
+### Actions and older apps
+
+An app that shows action buttons passes `context["features"] = ["actions"]`; it reads an error's `action`
+attribute (`{"id", "label", "hint"}`, in the app's language) and calls `action(action_id, progress, cancel, options)`
+(→ `{"ok", "message"}`, `timeouts.action` = 900 s). The manifest lists the ids as a top-level `"actions"` key, not as
+a capability: current apps reject unknown capabilities but ignore unknown keys, so 1.0.5 still installs on them.
+Older apps without `features` get the same sign-in from the import itself: a blocked import opens the sign-in window
+(warning first) and goes on once the user signed in.
+
 ### Language
 
 Error and progress messages are in English, Traditional Chinese, Japanese or Korean: the app's language when the app
@@ -106,9 +116,9 @@ passes it (`context["locale"]`), otherwise the system's display language.
 |---|---|
 | Download the music video | off: audio only, the stage shows the thumbnail |
 | Use the uploader's subtitles as lyrics candidates | |
-| Sign in to YouTube in a separate window (Chrome / Edge) | off by default. See "Sign-in window" above. Your own cookies.txt or browser setting wins over it. |
-| Use my YouTube sign-in from a browser | off by default. For networks YouTube keeps blocking with "confirm you're not a bot": yt-dlp reads that browser's YouTube cookies and downloads as you. On Windows only Firefox works reliably (Chrome, Edge and Brave encrypt their cookies); on a Mac all four work (macOS asks for your password for Chrome, Edge and Brave). YouTube may restrict accounts that download a lot. |
-| Or a cookies.txt file | a Netscape-format cookies.txt exported from a signed-in browser |
+
+The sign-in needs no setting. The browser sign-in and cookies.txt settings of 1.0.2-1.0.4 are gone, and values
+saved by those versions are ignored.
 
 ## Install
 
@@ -137,8 +147,9 @@ community project: KAREOKIE doesn't build, sign or ship it, and no private key i
 
 The interface is documented in KAREOKIE's `docs/extensions.md`. Each call runs in its own process:
 `search(query, limit)`, `resolve(item_or_url, dest_dir, progress, cancel, options)`,
-`fetch_video(...)`, `metadata(item_or_url)`; `setup(context)` receives the settings (and, from newer
-apps, the app's `locale`). Tests (no network): `python -m unittest discover tests`.
+`fetch_video(...)`, `metadata(item_or_url)`, `action(action_id, progress, cancel, options)`; `setup(context)`
+receives the settings (and, from newer apps, the app's `locale` and `features`). Tests (no network, no browser):
+`python -m unittest discover tests`.
 
 ## License
 

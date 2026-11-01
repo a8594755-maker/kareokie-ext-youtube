@@ -64,51 +64,9 @@
         "ja": {"label": "投稿者の字幕を歌詞の候補に使う"},
         "ko": {"label": "업로더의 자막을 가사 후보로 사용"}
       }
-    },
-    {
-      "key": "signIn",
-      "type": "boolean",
-      "default": false,
-      "label": "Sign in to YouTube in a separate window (Chrome / Edge). Never your main account",
-      "description": "Don’t sign in with your main account: downloading with an account may make YouTube restrict or disable it. Use a separately created secondary account. For networks YouTube keeps blocking with “confirm you’re not a bot”. The account is used only when an import is blocked without it, gently and one at a time. After 30 imports a day it asks before going on (stopping is recommended), and it is paused for 24 hours at signs of trouble. That keeps use to a minimum but can’t guarantee the account won’t be restricted. The first time, Chrome (or Edge) opens with a profile of its own, separate from your usual one, shows this warning, then YouTube’s sign-in page, where you sign in yourself. The sign-in is kept. Turning this off signs out and deletes that profile.",
-      "i18n": {
-        "zh-TW": {"label": "在獨立視窗登入 YouTube（Chrome / Edge）：請勿用主帳號", "description": "請勿登入主帳號：用帳號下載可能讓 YouTube 限制或停用該帳號，請使用另外申請的小帳號。給 YouTube 一直要求確認不是機器人的網路使用。只有不登入匯入被擋下時才會用這個帳號，放慢速度、一次一個；每天超過 30 次會先詢問（建議停止），發現異常就暫停 24 小時。這樣能盡量少用帳號，但無法保證帳號不會被限制。第一次會用獨立的設定檔開啟 Chrome（或 Edge），和你平常用的分開，先顯示這個警告，再打開 YouTube 登入頁讓你自己登入。登入狀態會保存。關閉這個選項即會登出並刪除該設定檔。"},
-        "ja": {"label": "別ウィンドウで YouTube にログイン（Chrome / Edge）：メインのアカウントは使わない", "description": "メインのアカウントでログインしないでください。アカウントでダウンロードすると、YouTube がそのアカウントを制限または停止することがあります。別に作成したサブアカウントを使ってください。YouTube がボットではないことの確認を何度も求めるネットワーク向けです。アカウントはログインなしの取り込みがブロックされたときだけ、間隔を空けて 1 件ずつ使います。1 日 30 回を超えると続けるか確認し（やめることをおすすめします）、問題の兆候があれば 24 時間停止します。使用は最小限にしますが、制限されないことは保証できません。初回は普段とは別の専用プロファイルで Chrome（または Edge）が開き、この警告のあとに YouTube のログインページを表示するので、ご自身でログインしてください。ログインは保存されます。オフにするとログアウトし、そのプロファイルを削除します。"},
-        "ko": {"label": "별도 창에서 YouTube 로그인(Chrome / Edge): 주 계정 사용 금지", "description": "주 계정으로 로그인하지 마세요. 계정으로 다운로드하면 YouTube가 해당 계정을 제한하거나 정지할 수 있습니다. 별도로 만든 보조 계정을 사용하세요. YouTube가 로봇이 아닌지 계속 확인을 요청하는 네트워크용입니다. 계정은 로그인 없이 가져오기가 차단될 때만 천천히 한 번에 하나씩 사용합니다. 하루 30회를 넘으면 계속할지 묻고(멈추는 것을 권장), 문제 징후가 보이면 24시간 동안 중지합니다. 사용을 최소화하지만 계정이 제한되지 않는다고 보장할 수는 없습니다. 처음에는 평소 프로필과 분리된 전용 프로필로 Chrome(또는 Edge)이 열리고, 이 경고를 보여 준 뒤 YouTube 로그인 페이지를 열면 직접 로그인합니다. 로그인 상태는 저장됩니다. 끄면 로그아웃되고 해당 프로필이 삭제됩니다."}
-      }
-    },
-    {
-      "key": "cookiesFromBrowser",
-      "type": "select",
-      "default": "off",
-      "label": "Use my YouTube sign-in from a browser",
-      "description": "Only if YouTube keeps asking to confirm you're not a bot. yt-dlp reads that browser's YouTube cookies and downloads as you. Firefox works best: on Windows, Chrome, Edge and Brave encrypt their cookies, which usually can't be read. On a Mac, macOS asks for your password to let it read Chrome, Edge or Brave. YouTube may restrict an account that downloads a lot.",
-      "options": [
-        {"value": "off", "label": "Don't use", "i18n": {"zh-TW": {"label": "不使用"}, "ja": {"label": "使わない"}, "ko": {"label": "사용 안 함"}}},
-        {"value": "firefox", "label": "Firefox"},
-        {"value": "chrome", "label": "Chrome"},
-        {"value": "edge", "label": "Edge"},
-        {"value": "brave", "label": "Brave"}
-      ],
-      "i18n": {
-        "zh-TW": {"label": "使用瀏覽器的 YouTube 登入狀態", "description": "只在 YouTube 一直要求確認不是機器人時使用。yt-dlp 會讀取該瀏覽器的 YouTube Cookie，以你的帳號下載。Firefox 最可靠；Windows 上的 Chrome、Edge、Brave 會加密 Cookie，通常讀不到。在 Mac 上讀取 Chrome、Edge、Brave 時，macOS 會要求輸入密碼。下載量很大的帳號可能會被 YouTube 限制。"},
-        "ja": {"label": "ブラウザの YouTube ログインを使う", "description": "YouTube がボットではないことの確認を何度も求める場合のみ使ってください。yt-dlp がそのブラウザの YouTube の Cookie を読み取り、あなたのアカウントでダウンロードします。Firefox が最も確実です。Windows の Chrome・Edge・Brave は Cookie を暗号化しているため、通常は読み取れません。Mac で Chrome・Edge・Brave を読み取るときは macOS がパスワードを求めます。大量にダウンロードするアカウントは YouTube に制限されることがあります。"},
-        "ko": {"label": "브라우저의 YouTube 로그인 사용", "description": "YouTube가 로봇이 아닌지 계속 확인을 요청할 때만 사용하세요. yt-dlp가 해당 브라우저의 YouTube 쿠키를 읽어 내 계정으로 다운로드합니다. Firefox가 가장 확실합니다. Windows의 Chrome, Edge, Brave는 쿠키를 암호화하므로 보통 읽을 수 없습니다. Mac에서 Chrome, Edge, Brave를 읽을 때는 macOS가 암호를 요청합니다. 다운로드를 많이 하는 계정은 YouTube에서 제한할 수 있습니다."}
-      }
-    },
-    {
-      "key": "cookiesFile",
-      "type": "string",
-      "default": "",
-      "label": "Or a cookies.txt file",
-      "description": "Full path to a cookies.txt (Netscape format) exported from a browser that is signed in to YouTube. Leave it empty to not use one.",
-      "i18n": {
-        "zh-TW": {"label": "或使用 cookies.txt 檔案", "description": "從已登入 YouTube 的瀏覽器匯出的 cookies.txt（Netscape 格式）完整路徑。留空表示不使用。"},
-        "ja": {"label": "または cookies.txt ファイル", "description": "YouTube にログインしたブラウザから書き出した cookies.txt（Netscape 形式）のフルパス。空欄なら使いません。"},
-        "ko": {"label": "또는 cookies.txt 파일", "description": "YouTube에 로그인된 브라우저에서 내보낸 cookies.txt(Netscape 형식)의 전체 경로입니다. 비워 두면 사용하지 않습니다."}
-      }
     }
   ],
   "updateIndex": "https://raw.githubusercontent.com/a8594755-maker/kareokie-ext-youtube/main/index.json",
-  "timeouts": {"search": 40, "resolve": 1800, "metadata": 40, "video": 1800}
+  "actions": ["signin", "signout"],
+  "timeouts": {"search": 40, "resolve": 1800, "metadata": 40, "video": 1800, "action": 900}
 }
