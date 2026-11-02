@@ -12,9 +12,10 @@
   closing the window before that cancels. The user then signs in themselves and closes the window. The window is a
   plain browser with nothing attached (Google refuses to sign in a browser it sees being driven over DevTools:
   "This browser or app may not be secure"). Once it is closed, a headless browser on the same profile reads its
-  youtube.com / google.com cookies, the extension saves them as a cookies.txt in its data folder, and the app
-  retries the import. The browser shows Google's pages in the app's language (`--lang`).
-- Apps before 0.2.8 don't pass their language: the messages then follow the language picked in the desktop app
+  youtube.com / google.com cookies, the extension saves them in its data folder, sealed with Windows' data protection
+  (another Windows user or PC can't open them; elsewhere the file is readable by this user only), and the app
+  retries the import. yt-dlp gets a readable copy for the length of a call, deleted afterwards. The browser shows Google's pages in the app's language (`--lang`).
+- Apps before 0.3.0 don't pass their language: the messages then follow the language picked in the desktop app
   (its settings.json above the extension's data folder) before the system's.
 - New extension method `action(action_id, progress, cancel, options)` with `signin` and `signout`. Apps that show
   action buttons pass `context["features"] = ["actions"]`. The manifest lists the ids as a top-level `"actions"`
@@ -36,7 +37,7 @@
   Chrome", which read like the extension couldn't open Chrome.
 - Separate from KAREOKIE: the extension relies only on the public extension protocol (the SDK's `PROTOCOL.md`).
   It learns what a newer app can do only from the context (`appVersion`, `locale`, `features`), and builds with its
-  own `tools/kext.py` (no fallback into a KAREOKIE checkout). From app 0.2.8, which shows errors without the
+  own `tools/kext.py` (no fallback into a KAREOKIE checkout). From app 0.3.0, which shows errors without the
   exception class, a message's title is in the message itself; older apps still get it as the class name. The README
   links only the public site and SDK.
 - Cancelling an import stops it at once, also while yt-dlp is still reading YouTube's pages (before only its

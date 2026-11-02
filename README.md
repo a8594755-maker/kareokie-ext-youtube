@@ -65,10 +65,13 @@ import, which then goes through the account (see below).
 2. **The user signs in** there themselves, including any Google verification.
 3. The extension waits (up to 15 minutes, cancellable) until youtube.com has a signed-in session, reads that window's
    youtube.com and google.com cookies with the DevTools protocol's `Storage.getCookies` (a small standard-library
-   WebSocket client, no extra dependency), writes them to `<dataDir>/signin/cookies.txt` and closes the window.
+   WebSocket client, no extra dependency), seals them in `<dataDir>/signin/cookies.dat` and closes the window.
 
 The sign-in is kept: yt-dlp downloads with it and saves the cookies YouTube refreshes back to it after every call
-(through a copy that replaces `cookies.txt` in one step, so a call killed mid-write can't break it). `dataDir`
+(through a copy that is sealed again in one step, so a call killed mid-write can't break it). On Windows the file is
+sealed with Windows' data protection, so it can't be opened by another Windows user or on another PC; elsewhere it is a
+file only this user can read. This doesn't stop other programs running as the same user, and yt-dlp needs a readable
+copy for the length of a call, which is deleted afterwards. Use a secondary account either way. `dataDir`
 survives app restarts and extension updates, so there's no need to sign in again. When YouTube stops accepting it,
 the error says so and offers the button again (warning first); the kept profile is usually still signed in, so the
 window just closes again with fresh cookies. Only `action("signout")` deletes the profile and the cookies. Cookie values are never logged or put in messages, and only yt-dlp's requests to YouTube / Google
@@ -148,7 +151,7 @@ private key is ever committed.
 
 The extension follows the public extension protocol, version 1 ([`PROTOCOL.md` in the extension SDK](https://github.com/a8594755-maker/kareokie-extension-sdk))
 and nothing else of KAREOKIE: no app modules, files or settings outside `dataDir` and the song folder, and no
-special treatment of its id. What a newer app can do is read from the context: `appVersion` (from 0.2.8 errors are
+special treatment of its id. What a newer app can do is read from the context: `appVersion` (from 0.3.0 errors are
 shown without the exception class, so the title goes into the message), `locale` and `features`. Each call runs in its
 own process:
 `search(query, limit)`, `resolve(item_or_url, dest_dir, progress, cancel, options)`,

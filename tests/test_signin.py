@@ -10,6 +10,7 @@ import socket
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import urllib.parse
 
@@ -141,7 +142,7 @@ class SignInTest(SignInBase):
         self.cookies = [SIGNED_IN]
         messages = []
         path = main.ensure_signin(lambda p, m: messages.append(m), lambda: None)
-        self.assertEqual(path, os.path.join(self.data.name, "signin", "cookies.txt"))
+        self.assertEqual(path, os.path.join(self.data.name, "signin", "cookies.dat"))
         self.assertEqual(main._signin_cookies(), path)
         # the user signs in in a plain window (no DevTools: Google refuses a driven browser) and closes it; then a
         # headless browser on the profile reads the cookies and closes
@@ -150,8 +151,7 @@ class SignInTest(SignInBase):
         self.assertTrue(self.reader.closed)
         self.assertTrue(messages[0].startswith("Don’t sign in with your main account"))
         self.assertIn("sign in to YouTube there, then close the window", messages[0])
-        with open(path, encoding="utf-8") as f:
-            lines = f.read().splitlines()
+        lines = main._read_cookies().splitlines()
         self.assertEqual(lines[0], "# Netscape HTTP Cookie File")
         self.assertIn("#HttpOnly_.youtube.com\tTRUE\t/\tTRUE\t1830000000\t__Secure-3PSID\ts3", lines)
         self.assertIn(".youtube.com\tTRUE\t/\tTRUE\t1830000000\tSAPISID\tsap", lines)
@@ -331,8 +331,7 @@ class SignInTest(SignInBase):
 
     def test_yt_dlp_saves_refreshed_cookies_through_a_copy(self):
         path = self.sign_in()
-        with open(path, encoding="utf-8") as f:
-            before = f.read()
+        before = main._read_cookies()
 
         class FakeYDL:
             def __init__(self, cookiefile, write):
@@ -349,16 +348,14 @@ class SignInTest(SignInBase):
         work = main._cookie_work_copy()
         with main._SignedInYDL(FakeYDL(work, refreshed), work):
             pass
-        with open(path, encoding="utf-8") as f:
-            self.assertEqual(f.read(), refreshed)
+        self.assertEqual(main._read_cookies(), refreshed)
         self.assertFalse(os.path.exists(work))
-        # a save cut short (an empty or broken file) leaves cookies.txt as it was
+        # a save cut short (an empty or broken file) leaves the kept cookies as they were
         for broken in ("", "# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/"):
             work = main._cookie_work_copy()
             with main._SignedInYDL(FakeYDL(work, broken), work):
                 pass
-            with open(path, encoding="utf-8") as f:
-                self.assertEqual(f.read(), refreshed)
+            self.assertEqual(main._read_cookies(), refreshed)
             self.assertFalse(os.path.exists(work))
         # signed out meanwhile: not brought back
         work = main._cookie_work_copy()
@@ -366,6 +363,47 @@ class SignInTest(SignInBase):
         with main._SignedInYDL(FakeYDL(work, refreshed), work):
             pass
         self.assertFalse(os.path.exists(path))
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows data protection")
+    def test_cookies_are_not_readable_at_rest(self):
+        path = self.sign_in()
+        with open(path, "rb") as f:
+            stored = f.read()
+        self.assertNotIn(b"youtube.com", stored)
+        self.assertNotIn(b"Netscape", stored)
+        self.assertIn("youtube.com", main._read_cookies())
+        self.assertEqual([n for n in os.listdir(os.path.dirname(path)) if n.startswith("cookies")], ["cookies.dat"])
+        work = main._cookie_work_copy()  # yt-dlp's copy is readable, and goes when the call ends
+        with open(work, encoding="utf-8") as f:
+            self.assertIn("youtube.com", f.read())
+        main._keep_cookies(work)
+        self.assertFalse(os.path.exists(work))
+
+    def test_a_plain_file_from_an_earlier_build_is_sealed_and_removed(self):
+        path = self.sign_in()
+        text = main._read_cookies()
+        os.remove(path)
+        plain = os.path.join(os.path.dirname(path), "cookies.txt")
+        with open(plain, "w", encoding="utf-8") as f:
+            f.write(text)
+        self.assertEqual(main._signin_cookies(), path)
+        self.assertFalse(os.path.exists(plain))
+        self.assertEqual(main._read_cookies(), text)
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows data protection")
+    def test_a_file_this_user_cannot_open_counts_as_no_sign_in(self):
+        path = self.sign_in()
+        with open(path, "wb") as f:
+            f.write(b"from another PC")
+        self.assertIsNone(main._signin_cookies())
+        self.assertFalse(os.path.exists(path))
+
+    def test_a_copy_left_by_a_killed_call_is_swept(self):
+        self.sign_in()
+        work = main._cookie_work_copy()
+        os.utime(work, (time.time() - main.WORK_COPY_STALE_SEC - 5,) * 2)
+        main._signin_cookies()
+        self.assertFalse(os.path.exists(work))
 
 
 class AccountTest(SignInBase):

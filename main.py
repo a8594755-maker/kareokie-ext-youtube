@@ -395,9 +395,9 @@ def ensure_js_runtime(progress: Optional[Callable[..., None]] = None,
 # ---------------------------------------------------------------------------
 # Readable errors
 #
-# The app shows "YouTube couldn't finish: <message>"; apps before 0.2.8 put the exception class in front
+# The app shows "YouTube couldn't finish: <message>"; apps before 0.3.0 put the exception class in front
 # ("<class>: <message>", see the protocol's Errors). So a message is a short title and what to do: in the message
-# from 0.2.8 on, as the class name before. Errors the app already explains (private, age-restricted, region,
+# from 0.3.0 on, as the class name before. Errors the app already explains (private, age-restricted, region,
 # removed, 429, network) pass through unchanged. Messages and progress follow the app's language.
 # ---------------------------------------------------------------------------
 
@@ -650,7 +650,7 @@ def _lang_of(tag: str) -> str:
 
 
 def _desktop_app_language() -> str:
-    """Apps before 0.2.8 don't pass their language: the desktop app's settings.json, a few folders above this
+    """Apps before 0.3.0 don't pass their language: the desktop app's settings.json, a few folders above this
     extension's data folder, has the one the user picked ("" when there is none)."""
     folder = _context.get("dataDir")
     for _ in range(6):
@@ -703,9 +703,9 @@ def _text(key: str, **fmt: Any) -> str:
 
 
 def _app_shows_class() -> bool:
-    """Apps before 0.2.8 show an error as "<exception class>: <message>" (context["appVersion"]; "dev": a checkout)."""
+    """Apps before 0.3.0 show an error as "<exception class>: <message>" (context["appVersion"]; "dev": a checkout)."""
     version = str(_context.get("appVersion") or "")
-    return version != "dev" and _vtuple(version) < (0, 2, 8)
+    return version != "dev" and _vtuple(version) < (0, 3, 0)
 
 
 def _host_has_actions() -> bool:
@@ -756,7 +756,7 @@ def readable_error(kind: str, exc: BaseException, again: bool = False, browser: 
 # goes on to YouTube's sign-in page; closing the window cancels. The user signs in there themselves; the extension
 # waits until youtube.com has a signed-in session, asks the browser for its youtube.com / google.com cookies over the
 # DevTools protocol (Chrome allows remote debugging only on a profile like this one), writes them to
-# <dataDir>/signin/cookies.txt and closes the window. Nothing is read before the warning is accepted.
+# <dataDir>/signin/cookies.dat (sealed) and closes the window. Nothing is read before the warning is accepted.
 #
 # yt-dlp then downloads as that account and saves the cookies YouTube refreshes back to the file (through a copy that
 # replaces it in one step), so the sign-in lasts across imports, app restarts and extension updates (the app keeps
@@ -772,7 +772,7 @@ SIGNIN_PROGRESS_EVERY_SEC = 20  # the app gives up on a call that stays quiet to
 SIGNIN_START_SEC = 30
 SIGNIN_COOKIE_DOMAINS = ("youtube.com", "google.com")
 SIGNED_IN_COOKIES = ("SAPISID", "__Secure-3PAPISID", "__Secure-3PSID")
-WORK_COPY_STALE_SEC = 3600  # a yt-dlp call's copy of cookies.txt left by a call that was killed
+WORK_COPY_STALE_SEC = 3600  # a yt-dlp call's readable copy of the cookies left by a call that was killed
 
 # shown on the warning page and at the start of the sign-in progress message
 MAIN_ACCOUNT: Dict[str, str] = {
@@ -893,10 +893,94 @@ def _refresh_marker() -> str:
     return os.path.join(_signin_dir() or "", "refresh")
 
 
+def _dpapi(data: bytes, seal: bool) -> bytes:
+    """Windows' data protection: only this Windows user on this PC can open what it sealed."""
+    import ctypes
+    from ctypes import wintypes
+
+    class Blob(ctypes.Structure):
+        _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
+
+    crypt32 = ctypes.WinDLL("crypt32", use_last_error=True)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    call = crypt32.CryptProtectData if seal else crypt32.CryptUnprotectData
+    call.argtypes = [ctypes.POINTER(Blob), ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
+                     wintypes.DWORD, ctypes.POINTER(Blob)]
+    call.restype = wintypes.BOOL
+    kernel32.LocalFree.argtypes = [ctypes.c_void_p]
+    kernel32.LocalFree.restype = ctypes.c_void_p
+    source = ctypes.create_string_buffer(data, len(data))
+    given = Blob(len(data), ctypes.cast(source, ctypes.POINTER(ctypes.c_char)))
+    out = Blob()
+    if not call(ctypes.byref(given), None, None, None, None, 1, ctypes.byref(out)):  # 1: never show a prompt
+        raise OSError(ctypes.get_last_error(), "Windows data protection refused")
+    try:
+        return ctypes.string_at(out.pbData, out.cbData)
+    finally:
+        kernel32.LocalFree(out.pbData)
+
+
+def _cookies_path() -> str:
+    return os.path.join(_signin_dir() or "", "cookies.dat")
+
+
+def _write_private(path: str, data: bytes) -> None:
+    """In one step, and readable by this user only."""
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_CREAT | os.O_TRUNC | os.O_WRONLY | getattr(os, "O_BINARY", 0), 0o600)
+    with os.fdopen(fd, "wb") as f:
+        f.write(data)
+    os.replace(tmp, path)
+
+
+def _write_cookies(text: str) -> None:
+    """The sign-in's cookies at rest: sealed on Windows; elsewhere a file only this user can read."""
+    data = text.encode("utf-8")
+    _write_private(_cookies_path(), _dpapi(data, True) if sys.platform == "win32" else data)
+
+
+def _read_cookies() -> str:
+    with open(_cookies_path(), "rb") as f:
+        data = f.read()
+    return (_dpapi(data, False) if sys.platform == "win32" else data).decode("utf-8")
+
+
+def _sweep_work_copies() -> None:
+    for old in glob.glob(os.path.join(_signin_dir() or "", "cookies.*.work")):
+        try:
+            if time.time() - os.path.getmtime(old) > WORK_COPY_STALE_SEC:
+                os.remove(old)
+        except OSError:
+            pass
+
+
 def _signin_cookies() -> Optional[str]:
+    """The saved sign-in's file, or None. A plain cookies.txt from an earlier 1.0.5 test build is sealed and removed.
+    A file this user can't open (copied from another PC or user) counts as no sign-in."""
     folder = _signin_dir()
-    path = os.path.join(folder, "cookies.txt") if folder else ""
-    return path if path and os.path.isfile(path) else None
+    if not folder or not os.path.isdir(folder):
+        return None
+    _sweep_work_copies()
+    path = _cookies_path()
+    plain = os.path.join(folder, "cookies.txt")
+    if os.path.isfile(plain):
+        try:
+            with open(plain, encoding="utf-8") as f:
+                _write_cookies(f.read())
+            os.remove(plain)
+        except (OSError, ValueError):
+            pass
+    if not os.path.isfile(path):
+        return None
+    try:
+        _read_cookies()
+    except (OSError, ValueError):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        return None
+    return path
 
 
 def sign_out() -> None:
@@ -1275,10 +1359,8 @@ def ensure_signin(progress: Optional[Callable[..., None]] = None, cancel: Option
         cookies = _profile_cookies(exe, profile, cancel)
         if not _signed_in(cookies):
             raise SignInClosed()
-        path = os.path.join(folder, "cookies.txt")
-        with open(path + ".tmp", "w", encoding="utf-8", newline="\n") as f:
-            f.write(_netscape(cookies))
-        os.replace(path + ".tmp", path)
+        _write_cookies(_netscape(cookies))
+        path = _cookies_path()
         try:
             os.remove(_refresh_marker())
         except OSError:
@@ -1349,31 +1431,26 @@ def _ask_over_cap(progress: Optional[Callable[..., None]], cancel: Optional[Call
 
 
 def _cookie_work_copy() -> str:
-    """A copy of cookies.txt for one yt-dlp call (yt-dlp rewrites its cookiefile in place when it closes)."""
+    """A readable copy of the cookies for one yt-dlp call, which needs a cookies.txt and rewrites it in place when it
+    closes. Removed when the call ends (_keep_cookies), or by the sweep if the call was killed."""
     folder = _signin_dir() or ""
-    for old in glob.glob(os.path.join(folder, "cookies.*.work")):
-        try:
-            if time.time() - os.path.getmtime(old) > WORK_COPY_STALE_SEC:
-                os.remove(old)
-        except OSError:
-            pass
+    _sweep_work_copies()
     work = os.path.join(folder, f"cookies.{os.getpid()}.{os.urandom(4).hex()}.work")
-    shutil.copyfile(os.path.join(folder, "cookies.txt"), work)
+    _write_private(work, _read_cookies().encode("utf-8"))
     return work
 
 
 def _keep_cookies(work: str) -> None:
-    """Put the cookies yt-dlp saved (YouTube refreshes them) in place of cookies.txt in one step. Not after a
+    """Seal the cookies yt-dlp saved (YouTube refreshes them) in place of the kept ones, in one step. Not after a
     sign-out, and not a file a killed or failed save left empty or broken."""
-    path = os.path.join(_signin_dir() or "", "cookies.txt")
     try:
         with open(work, encoding="utf-8") as f:
-            ok = any(line.split("\t")[0].removeprefix("#HttpOnly_").lstrip(".").endswith("youtube.com")
-                     and line.count("\t") == 6 for line in f)
-        if ok and os.path.isfile(path):
-            os.replace(work, path)
-            return
-    except OSError:
+            text = f.read()
+        ok = any(line.split("\t")[0].removeprefix("#HttpOnly_").lstrip(".").endswith("youtube.com")
+                 and line.count("\t") == 6 for line in text.splitlines())
+        if ok and os.path.isfile(_cookies_path()):
+            _write_cookies(text)
+    except (OSError, ValueError):
         pass
     try:
         os.remove(work)
@@ -1382,7 +1459,7 @@ def _keep_cookies(work: str) -> None:
 
 
 class _SignedInYDL:
-    """A YoutubeDL using a copy of the sign-in's cookies.txt, which replaces the file when yt-dlp is done."""
+    """A YoutubeDL using a readable copy of the sign-in's cookies; what it saves is sealed again when it is done."""
 
     def __init__(self, ydl: Any, work: str) -> None:
         self.ydl = ydl
