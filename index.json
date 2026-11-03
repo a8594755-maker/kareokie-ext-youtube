@@ -5,7 +5,7 @@
     {
       "id": "youtube",
       "name": "YouTube",
-      "version": "1.0.4",
+      "version": "1.0.5",
       "description": "Search YouTube and import videos you have the rights to use (audio, music video and the uploader's subtitles), with yt-dlp.",
       "author": "kareokie-ext-youtube contributors",
       "homepage": "https://github.com/a8594755-maker/kareokie-ext-youtube",
@@ -25,12 +25,16 @@
         "ja": {
           "name": "YouTube",
           "description": "YouTube を検索し、利用する権利のある動画（音声・MV・投稿者の字幕）を yt-dlp で取り込みます。"
+        },
+        "ko": {
+          "name": "YouTube",
+          "description": "YouTube를 검색하고 이용 권한이 있는 동영상(오디오, 뮤직비디오, 업로더의 자막)을 yt-dlp로 가져옵니다."
         }
       },
       "official": false,
-      "downloadUrl": "https://github.com/a8594755-maker/kareokie-ext-youtube/releases/download/v1.0.4/kareokie-ext-youtube-1.0.4.zip",
-      "sha256": "23d382dd02668be5aaeba041c5d1ee146b5bb9fb089662cc3fc52f51aa6996fb",
-      "size": 24972
+      "downloadUrl": "https://github.com/a8594755-maker/kareokie-ext-youtube/releases/download/v1.0.5/kareokie-ext-youtube-1.0.5.zip",
+      "sha256": "4dc5926f135df041bc387e0e0825a31b943dda65957fbccf540afa423777f516",
+      "size": 44345
     }
   ]
 }
