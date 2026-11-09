@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.6 — 2026-11-09
+
+- Every error now carries an `error_code` (the extension protocol's optional attribute, app 0.3.2 and later), so the
+  app's anonymous crash reports group failed imports by cause instead of by the message, which is in each user's
+  language. Never shown to the user; older apps ignore it, and nothing else changes.
+  - The extension's own messages: their kind (`blocked`, `blocked.again`, `cookies`, `signin-needed`,
+    `signin-expired`, `account-cap`, `account-paused`, ...). "YouTube changed something yt-dlp can't handle yet"
+    also says which sign yt-dlp gave: `changed.format`, `changed.signature`, `changed.nsig`, `changed.images`,
+    `changed.http403`.
+  - Errors passed through as yt-dlp wrote them (the app explains these itself): `private`, `members_only`,
+    `age_restricted`, `region_blocked`, `live_not_started`, `copyright`, `unavailable`, `rate_limited`,
+    `certificate`, `network`, `bad_url`, `ffmpeg`, `disk`, `file_in_use`; anything else keeps no code and groups by
+    its exception class, as before.
+  - A finished download without an audio file: `no_audio`.
+
 ## 1.0.5 — 2026-11-01
 
 - Sign in to YouTube from the import panel, with no setup. When YouTube's "confirm you're not a bot" check blocks

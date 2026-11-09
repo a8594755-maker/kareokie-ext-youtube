@@ -641,6 +641,84 @@ class YouTubeError(Exception):
     """A yt-dlp failure explained for the user (the original error is chained for the technical details)."""
 
 
+# ---------------------------------------------------------------------------
+# Error codes (app 0.3.2 and later; PROTOCOL.md "Errors")
+#
+# Every error the extension raises carries `error_code`, a short stable English name of the cause. The user never
+# sees it: the app's anonymous crash reports group failed imports by it, since the message is in the user's
+# language. Older apps ignore it.
+# ---------------------------------------------------------------------------
+
+# which of the "changed" signs yt-dlp gave (the most common failure; this tells them apart)
+_CHANGED_CODES: Tuple[Tuple[str, str], ...] = (
+    ("requested format is not available", "changed.format"),
+    ("signature extraction failed", "changed.signature"),
+    ("nsig extraction failed", "changed.nsig"),
+    ("only images are available", "changed.images"),
+    ("http error 403", "changed.http403"),
+)
+
+# errors passed through unchanged (the app explains them itself), by yt-dlp's message; the first match wins
+_CAUSE_CODES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
+    ("private", ("private video", "video is private")),
+    ("members_only", ("members-only", "members only", "join this channel")),
+    ("age_restricted", ("confirm your age", "age-restricted", "age restricted", "inappropriate for some users")),
+    ("region_blocked", ("not available in your country", "blocked it in your country", "geo restrict",
+                        "geo-restrict", "not made this video available in your country")),
+    ("live_not_started", ("premieres in", "live event will begin", "this live event", "is upcoming")),
+    ("copyright", ("copyright claim", "copyright grounds")),
+    ("unavailable", ("video unavailable", "has been removed", "does not exist", "no longer available",
+                     "account associated with this video has been terminated", "this video is unavailable")),
+    ("rate_limited", ("http error 429", "too many requests")),
+    ("certificate", ("certificate verify failed", "certificate_verify_failed")),
+    ("network", ("timed out", "timeout", "connection refused", "connection reset", "connection aborted",
+                 "getaddrinfo", "name resolution", "network is unreachable", "temporary failure in name",
+                 "remote end closed", "connection broken", "incomplete read")),
+    ("bad_url", ("unsupported url", "incomplete youtube id", "is not a valid url", "invalid url")),
+    ("ffmpeg", ("ffmpeg not found", "ffprobe not found", "ffmpeg is not installed", "postprocessing:")),
+    ("disk", ("no space left", "disk full", "errno 28")),
+    ("file_in_use", ("winerror 32", "being used by another process", "permission denied", "winerror 5")),
+)
+
+
+def cause_code(exc: BaseException) -> Optional[str]:
+    """The error code of an error the extension passes through as it is (yt-dlp's own, a network error, ...)."""
+    low = f"{type(exc).__name__}: {exc}".lower().replace("’", "'")
+    for code, keys in _CAUSE_CODES:
+        if any(k in low for k in keys):
+            return code
+    return None
+
+
+def tagged(exc: BaseException) -> BaseException:
+    """`exc` with an error code, when it has none yet and the cause is known (an exception that refuses new
+    attributes is returned as it is)."""
+    if not getattr(exc, "error_code", None):
+        code = cause_code(exc)
+        if code:
+            try:
+                exc.error_code = code  # type: ignore[attr-defined]
+            except (AttributeError, TypeError):
+                pass
+    return exc
+
+
+def readable_code(kind: str, exc: BaseException, again: bool = False) -> str:
+    """The error code of a readable_error(): its kind, with which sign of a change, or a repeated bot check."""
+    if kind == "changed":
+        low = f"{type(exc).__name__}: {exc}".lower()
+        return next((code for key, code in _CHANGED_CODES if key in low), "changed")
+    if kind == "blocked" and again:
+        return "blocked.again"
+    return kind
+
+
+class NoAudio(RuntimeError):
+    """yt-dlp finished without an audio file."""
+
+    error_code = "no_audio"
+
+
 def _lang_of(tag: str) -> str:
     tag = tag.lower()
     for prefix, lang in (("zh", "zh-TW"), ("ja", "ja"), ("ko", "ko")):
@@ -738,6 +816,7 @@ def readable_error(kind: str, exc: BaseException, again: bool = False, browser: 
     else:
         err = YouTubeError(sentence)
     err.kind = kind  # type: ignore[attr-defined]
+    err.error_code = readable_code(kind, exc, again)  # type: ignore[attr-defined]
     err.sentence = sentence  # type: ignore[attr-defined]  # the whole message, for action() results
     if action == "signin":
         label, hint = ACTION_SIGNIN[lang]
@@ -1629,7 +1708,7 @@ def _run(call: Callable[[], Any], progress: Optional[Callable[..., None]] = None
             except Exception as exc2:  # noqa: BLE001
                 exc, kind = exc2, error_kind(exc2)
         if kind is None:
-            raise exc
+            raise tagged(exc)
         if kind == "blocked" and key:
             _remember_blocked(key, True)
         raise readable_error(kind, exc, again=again) from exc
@@ -1807,7 +1886,7 @@ def _with_account(call_with: Callable[[bool, Any], Any], progress: Optional[Call
             if error_kind(exc) != "blocked":
                 kind = error_kind(exc)
                 if kind is None:
-                    raise exc
+                    raise tagged(exc)
                 raise readable_error(kind, exc) from exc
         until = _pause_account(str(exc).splitlines()[0][:200])
         raise readable_error("account-paused", exc, extra={"until": _until_text(until)}) from exc
@@ -1995,7 +2074,7 @@ def resolve(item_or_url: Any, dest_dir: str, progress: Callable[..., None], canc
         files = [w for w in glob.glob(os.path.join(dest_dir, "raw_audio.*"))
                  if not w.endswith((".vtt", ".part", ".ytdl", ".json"))]
         if not files:
-            raise RuntimeError("Couldn't download audio from that YouTube URL. Check that the URL is valid.")
+            raise NoAudio("Couldn't download audio from that YouTube URL. Check that the URL is valid.")
         raw = files[0]
 
     subtitles = []
