@@ -5,7 +5,7 @@
     {
       "id": "youtube",
       "name": "YouTube",
-      "version": "1.0.5",
+      "version": "1.0.6",
       "description": "Search YouTube and import videos you have the rights to use (audio, music video and the uploader's subtitles), with yt-dlp.",
       "author": "kareokie-ext-youtube contributors",
       "homepage": "https://github.com/a8594755-maker/kareokie-ext-youtube",
@@ -32,9 +32,9 @@
         }
       },
       "official": false,
-      "downloadUrl": "https://github.com/a8594755-maker/kareokie-ext-youtube/releases/download/v1.0.5/kareokie-ext-youtube-1.0.5.zip",
-      "sha256": "4dc5926f135df041bc387e0e0825a31b943dda65957fbccf540afa423777f516",
-      "size": 44345
+      "downloadUrl": "https://github.com/a8594755-maker/kareokie-ext-youtube/releases/download/v1.0.6/kareokie-ext-youtube-1.0.6.zip",
+      "sha256": "86bef9ca17d4749aedfc3dc4b1bac133e690fea601a8ff7f800b61f0d0d65cd7",
+      "size": 46123
     }
   ]
 }
