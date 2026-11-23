@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.7 — 2026-11-23
+
+- Installation and extension updates now install yt-dlp 2026.10.26 and yt-dlp-ejs 0.8.0 from hash-verified
+  wheels. Updating from 1.0.6 reinstalls both dependencies. The extension's import-time updater can still pick
+  up later yt-dlp releases.
+- 安裝或更新擴充時，會從通過雜湊驗證的 wheel 安裝 yt-dlp 2026.10.26 與 yt-dlp-ejs 0.8.0。
+  從 1.0.6 更新時會重新安裝這兩個套件。擴充在匯入時仍可自動更新至後續的 yt-dlp 版本。
+
 ## 1.0.6 — 2026-11-09
 
 - Every error now carries an `error_code` (the extension protocol's optional attribute, app 0.3.2 and later), so the

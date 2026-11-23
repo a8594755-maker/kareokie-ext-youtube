@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "youtube",
   "name": "YouTube",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "author": "kareokie-ext-youtube contributors",
   "description": "Search YouTube and import videos you have the rights to use (audio, music video and the uploader's subtitles), with yt-dlp.",
   "homepage": "https://github.com/a8594755-maker/kareokie-ext-youtube",
@@ -15,7 +15,10 @@
     "^(?:https?://)?(?:www\\.|m\\.)?youtube\\.com/(?:shorts|embed|live)/(?P<id>[A-Za-z0-9_-]{11})",
     "^(?:https?://)?youtu\\.be/(?P<id>[A-Za-z0-9_-]{11})"
   ],
-  "requirements": ["yt-dlp>=2026.10.21", "yt-dlp-ejs"],
+  "requirements": [
+    "yt-dlp==2026.10.26 --hash=sha256:a05c5b5d8562f7e8a62f5334348b406af4930d56d3a65f8021d14af0e22339ae",
+    "yt-dlp-ejs==0.8.0 --hash=sha256:79300e5fca7f937a1eeede11f0456862c1b41107ce1d726871e0207424f4bdb4"
+  ],
   "permissions": ["network", "files:song-folder"],
   "notes": "Downloads from youtube.com with yt-dlp. Always free, distributed separately from KAREOKIE.",
   "terms": {
