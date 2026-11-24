@@ -21,18 +21,21 @@ For accessing content you have the rights to use; you must follow YouTube's Term
 from __future__ import annotations
 
 import glob
+import hashlib
 import importlib
 import json
-import hashlib
 import os
 import platform
 import re
 import shutil
+import signal
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 import zipfile
+from datetime import date, datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 SUBTITLE_LANGS = ["zh-TW", "zh-Hant", "zh-HK", "zh-CN", "zh", "yue", "yue-HK", "nan", "nan-TW", "ja", "ko", "en"]
@@ -56,15 +59,16 @@ def setup(context: Dict[str, Any]) -> None:
 #
 # The app installs yt-dlp into _deps/ once, when the extension is installed, and keeps it while the
 # requirements stay the same. YouTube changes often and old yt-dlp versions get blocked or break, so
-# imports check PyPI at most every UPDATE_EVERY_SEC (and again, sooner, after an error a newer yt-dlp may
-# fix) and install a newer yt-dlp into <dataDir>/yt-dlp/<version>/. Whichever copy is newer is used.
+# successful imports schedule a background check. An import waits for an update only after yt-dlp fails
+# with an error a newer version may fix. Updates land in <dataDir>/yt-dlp/<version>/.
 # The updater never fails an import: any problem is logged and the current copy is kept.
 # ---------------------------------------------------------------------------
 
 UPDATE_EVERY_SEC = 12 * 3600
 RECHECK_AFTER_ERROR_SEC = 30 * 60
+RECENT_YT_DLP_DAYS = 35  # cover a roughly monthly release gap, including the bundled 2026.10.26
 PYPI_URL = "https://pypi.org/pypi/yt-dlp/json"
-PIP_TIMEOUT_SEC = 300
+PIP_TIMEOUT_SEC = 90
 LOCK_STALE_SEC = 600
 _active: Dict[str, Any] = {"path": None}
 
@@ -177,25 +181,141 @@ def _take_lock(store: str) -> Optional[str]:
         return None  # another call is updating right now
 
 
+def _update_due(state: Dict[str, Any], after_error: bool = False) -> bool:
+    try:
+        released = date(*_vtuple(_active_version())[:3])
+        recent = (datetime.now(timezone.utc).date() - released).days <= RECENT_YT_DLP_DAYS
+    except (TypeError, ValueError):
+        recent = False
+    interval = RECHECK_AFTER_ERROR_SEC if after_error or state.get("updateError") or not recent else UPDATE_EVERY_SEC
+    try:
+        checked = float(state.get("checkedAt") or 0)
+    except (TypeError, ValueError):
+        checked = 0
+    return time.time() - checked >= interval
+
+
+def _refresh_yt_dlp() -> None:
+    """Start a refresh outside the runner, which exits as soon as resolve() returns."""
+    data = _context.get("dataDir")
+    if not data or not _bundled_version() or not _update_due(_read_state()):
+        return
+    # DETACHED_PROCESS on Windows, a new session on POSIX. No inherited host protocol handles.
+    flags = {"creationflags": 0x00000008} if sys.platform == "win32" else {"start_new_session": True}
+    data = os.path.abspath(data)
+    try:
+        os.makedirs(data, exist_ok=True)
+        cmd = [sys.executable, "-B", os.path.join(HERE, "main.py"), "--refresh-yt-dlp", data]
+        # The runner's working directory can be the song folder, which the app may move on return.
+        subprocess.Popen(cmd, cwd=data, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, **flags)
+    except OSError as exc:
+        print(f"[yt-dlp update] couldn't start background refresh: {exc}")
+
+
+def _run_windows_pip(cmd: List[str], env: Dict[str, str], output: Any) -> int:
+    """Put the launcher in a kill-on-close Job Object before it can start pip or any child."""
+    import ctypes
+    from ctypes import wintypes
+
+    class BasicLimits(ctypes.Structure):
+        _fields_ = [
+            ("PerProcessUserTimeLimit", ctypes.c_longlong), ("PerJobUserTimeLimit", ctypes.c_longlong),
+            ("LimitFlags", wintypes.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+            ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
+            ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD), ("SchedulingClass", wintypes.DWORD),
+        ]
+
+    class ExtendedLimits(ctypes.Structure):
+        _fields_ = [
+            ("BasicLimitInformation", BasicLimits), ("IoInfo", ctypes.c_ulonglong * 6),
+            ("ProcessMemoryLimit", ctypes.c_size_t), ("JobMemoryLimit", ctypes.c_size_t),
+            ("PeakProcessMemoryUsed", ctypes.c_size_t), ("PeakJobMemoryUsed", ctypes.c_size_t),
+        ]
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateJobObjectW.argtypes = (ctypes.c_void_p, wintypes.LPCWSTR)
+    kernel.CreateJobObjectW.restype = wintypes.HANDLE
+    kernel.SetInformationJobObject.argtypes = (wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD)
+    kernel.AssignProcessToJobObject.argtypes = (wintypes.HANDLE, wintypes.HANDLE)
+    kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
+    limits = ExtendedLimits()
+    limits.BasicLimitInformation.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    job = kernel.CreateJobObjectW(None, None)
+    if not job:
+        raise ctypes.WinError(ctypes.get_last_error())
+    proc = None
+    try:
+        if not kernel.SetInformationJobObject(job, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
+            raise ctypes.WinError(ctypes.get_last_error())  # JobObjectExtendedLimitInformation
+        # The private pipe carries a one-byte start signal. Pip itself reads from DEVNULL.
+        launcher = (
+            "import subprocess, sys\n"
+            "if sys.stdin.buffer.read(1) == b'1':\n"
+            "    sys.exit(subprocess.call(sys.argv[1:], stdin=subprocess.DEVNULL, "
+            "creationflags=subprocess.CREATE_NO_WINDOW))\n"
+        )
+        proc = subprocess.Popen([sys.executable, "-I", "-S", "-c", launcher, *cmd], env=env,
+                                stdin=subprocess.PIPE, stdout=output, stderr=subprocess.STDOUT,
+                                creationflags=subprocess.CREATE_NO_WINDOW)
+        assert proc.stdin is not None
+        with proc.stdin:
+            if not kernel.AssignProcessToJobObject(job, int(proc._handle)):
+                error = ctypes.WinError(ctypes.get_last_error())
+                proc.kill()
+                raise error
+            proc.stdin.write(b"1")
+        return proc.wait(timeout=PIP_TIMEOUT_SEC)
+    finally:
+        kernel.CloseHandle(job)
+        if proc is not None:
+            proc.wait()
+
+
+def _run_pip(cmd: List[str]) -> subprocess.CompletedProcess:
+    env = dict(os.environ, PIP_NO_INPUT="1", PIP_DISABLE_PIP_VERSION_CHECK="1",
+               PYTHONDONTWRITEBYTECODE="1", PIP_KEYRING_PROVIDER="disabled")
+    # No pipe reader can get stuck waiting for a grandchild to close stdout.
+    with tempfile.TemporaryFile() as output:
+        if sys.platform == "win32":
+            code = _run_windows_pip(cmd, env, output)
+        else:
+            with subprocess.Popen(cmd, env=env, stdin=subprocess.DEVNULL, stdout=output,
+                                  stderr=subprocess.STDOUT, start_new_session=True) as proc:
+                try:
+                    code = proc.wait(timeout=PIP_TIMEOUT_SEC)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    raise
+        size = output.seek(0, os.SEEK_END)
+        output.seek(max(0, size - 2000))
+        return subprocess.CompletedProcess(cmd, code, output.read().decode("utf-8", errors="replace"))
+
+
 def update_yt_dlp(progress: Optional[Callable[..., None]] = None, after_error: bool = False) -> bool:
     """Install a newer yt-dlp when one is out and it's time to look. True when a newer one was installed."""
     store = _store()
-    bundled = _bundled_version()
-    if not store or not bundled:
-        return False  # no data folder, or no yt-dlp of our own (a development / test setup): leave it alone
-    state = _read_state()
-    since = time.time() - float(state.get("checkedAt") or 0)
-    if since < (RECHECK_AFTER_ERROR_SEC if after_error else UPDATE_EVERY_SEC):
+    if not store or not _bundled_version() or not _update_due(_read_state(), after_error):
         return False
-    os.makedirs(store, exist_ok=True)
-    lock = _take_lock(store)
-    if lock is None:
-        return False
+    lock = None
+    tmp = None
     try:
+        os.makedirs(store, exist_ok=True)
+        lock = _take_lock(store)
+        if lock is None:
+            return False
+        state = _read_state()
+        if not _update_due(state, after_error):
+            return False  # another process finished a check while we were taking the lock
         latest, ejs = _latest_release()
         current = _active_version()
-        _write_state(dict(state, checkedAt=time.time(), latest=latest))
+        state["latest"] = latest
+        state.pop("updateError", None)
         if _vtuple(latest) <= _vtuple(current):
+            _write_state(dict(state, checkedAt=time.time()))
             return False
         if progress is not None:
             progress(None, _text("updating", current=current, latest=latest))
@@ -205,17 +325,14 @@ def update_yt_dlp(progress: Optional[Callable[..., None]] = None, after_error: b
         cmd = [sys.executable, "-m", "pip", "install", "--target", tmp, "--no-deps", "--upgrade", "--no-input",
                "--disable-pip-version-check", "--no-warn-script-location", "--progress-bar", "off",
                f"yt-dlp=={latest}", ejs]
-        done = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-                              errors="replace", timeout=PIP_TIMEOUT_SEC,
-                              creationflags=0x08000000 if sys.platform == "win32" else 0)
+        done = _run_pip(cmd)
         if done.returncode != 0 or _version_in(tmp) != latest:
-            print(f"[yt-dlp update] pip failed ({done.returncode}):\n{done.stdout[-2000:]}")
-            shutil.rmtree(tmp, ignore_errors=True)
-            return False
+            raise RuntimeError(f"pip failed ({done.returncode}):\n{done.stdout}")
         shutil.rmtree(target, ignore_errors=True)
         os.replace(tmp, target)
         previous = state.get("version")
-        _write_state(dict(_read_state(), version=latest, previousVersion=previous, updatedAt=time.time()))
+        now = time.time()
+        _write_state(dict(state, version=latest, previousVersion=previous, updatedAt=now, checkedAt=now))
         # keep the copy before this one: a call that started earlier may still be using it
         for name in os.listdir(store):
             path = os.path.join(store, name)
@@ -223,14 +340,22 @@ def update_yt_dlp(progress: Optional[Callable[..., None]] = None, after_error: b
                 shutil.rmtree(path, ignore_errors=True)
         print(f"[yt-dlp update] {current} → {latest}")
         return True
-    except Exception as exc:  # noqa: BLE001 - offline, PyPI down, pip missing…: keep the current yt-dlp
+    except Exception as exc:  # offline, PyPI down, pip missing…: keep the current yt-dlp
         print(f"[yt-dlp update] skipped: {exc}")
+        if lock is not None:
+            try:
+                _write_state(dict(_read_state(), checkedAt=time.time(), updateError=type(exc).__name__))
+            except OSError as state_error:
+                print(f"[yt-dlp update] couldn't record failure: {state_error}")
         return False
     finally:
-        try:
-            os.remove(lock)
-        except OSError:
-            pass
+        if tmp is not None:
+            shutil.rmtree(tmp, ignore_errors=True)
+        if lock is not None:
+            try:
+                os.remove(lock)
+            except OSError:
+                pass
 
 
 # ---------------------------------------------------------------------------
@@ -2036,7 +2161,6 @@ def resolve(item_or_url: Any, dest_dir: str, progress: Callable[..., None], canc
     options = options or {}
     url = _url(item_or_url)
     want_subs = _settings.get("subtitles", True)
-    _cancellable(lambda: update_yt_dlp(progress), cancel)
     ensure_js_runtime(progress, cancel)
     # 1. Download the highest bitrate audio stream as-is (no re-encode; KAREOKIE's separator
     #    decodes it once to 44.1 kHz float32) + subtitles
@@ -2081,6 +2205,7 @@ def resolve(item_or_url: Any, dest_dir: str, progress: Callable[..., None], canc
     for path in sorted(glob.glob(os.path.join(dest_dir, "raw_audio.*.vtt"))):
         m = re.search(r"\.([A-Za-z]{2,3}(?:-[A-Za-z0-9]+)*)\.vtt$", path)
         subtitles.append({"lang": m.group(1) if m else "und", "path": path, "kind": "subtitles"})
+    _refresh_yt_dlp()
     return {"audio_path": raw, "video_path": None, "subtitles": subtitles, "metadata": _metadata(info, url)}
 
 
@@ -2160,3 +2285,8 @@ def metadata(item_or_url: Any) -> Dict[str, Any]:
             return ydl.extract_info(url, download=False) or {}
 
     return _metadata(_run(call), url)
+
+
+if __name__ == "__main__" and len(sys.argv) == 3 and sys.argv[1] == "--refresh-yt-dlp":
+    setup({"dataDir": sys.argv[2]})
+    update_yt_dlp()

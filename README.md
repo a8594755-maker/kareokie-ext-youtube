@@ -19,11 +19,12 @@ files; online sources like this one are separate extensions you choose to instal
 | URLs | `youtube.com/watch?v=…`, `youtu.be/…`, `/shorts/`, `/embed/`, `/live/`, `music.youtube.com` |
 
 Dependencies: [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense) and `yt-dlp-ejs`, installed by KAREOKIE
-into this extension's own folder (`pip install --target`), never into the app. YouTube changes often, so the
-extension keeps yt-dlp up to date by itself: imports check PyPI at most every 12 hours and install a newer
-yt-dlp into the extension's data folder (`<dataDir>/yt-dlp/<version>/`); the newer of the two copies is used.
-An error a newer yt-dlp may fix ("confirm you're not a bot", missing formats, HTTP 403) checks again sooner and
-retries the import once. A "confirm you're not a bot" check is often a passing flag on one request, so a
+into this extension's own folder (`pip install --target`), never into the app. Successful imports schedule a
+background check at most every 12 hours for yt-dlp releases up to 35 days old, or every 30 minutes for older
+releases. The extension installs newer releases into `<dataDir>/yt-dlp/<version>/` and uses the newest copy.
+An error a newer yt-dlp may fix ("confirm you're not a bot", missing formats, HTTP 403) can trigger a check
+and retry during the import. After a failed check or installation, the updater tries again after 30 minutes.
+A "confirm you're not a bot" check is often a passing flag on one request, so a
 blocked import also waits and tries again (after 5, 15 and 30 s; searches once, after 3 s) before it reports
 the error. When Chrome or Edge is installed (or a sign-in is saved), a blocked import skips those waits and goes
 on to the sign-in instead (see "Sign-in window"). Some blocks don't pass, so a video blocked through every retry is

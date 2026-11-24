@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.8 — 2026-11-24
+
+- Imports use the installed yt-dlp first and check for updates in the background after a successful import.
+  An error an update may fix can still trigger an immediate retry. Update pip runs without prompts, stops
+  its process tree after 90 seconds, and waits 30 minutes before trying again after a failure.
+- 匯入會先使用已安裝的 yt-dlp，成功後在背景檢查更新。遇到新版可能修復的錯誤時，仍可立即檢查並重試。
+  更新時 pip 不會等待輸入，90 秒逾時會結束整棵程序樹，失敗後至少隔 30 分鐘再試。
+
 ## 1.0.7 — 2026-11-23
 
 - Installation and extension updates now install yt-dlp 2026.10.26 and yt-dlp-ejs 0.8.0 from hash-verified
