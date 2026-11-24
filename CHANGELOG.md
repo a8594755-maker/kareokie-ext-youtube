@@ -2,11 +2,10 @@
 
 ## 1.0.8 — 2026-11-24
 
-- Imports use the installed yt-dlp first and check for updates in the background after a successful import.
-  An error an update may fix can still trigger an immediate retry. Update pip runs without prompts, stops
-  its process tree after 90 seconds, and waits 30 minutes before trying again after a failure.
-- 匯入會先使用已安裝的 yt-dlp，成功後在背景檢查更新。遇到新版可能修復的錯誤時，仍可立即檢查並重試。
-  更新時 pip 不會等待輸入，90 秒逾時會結束整棵程序樹，失敗後至少隔 30 分鐘再試。
+- Fixed a hang during the pre-import yt-dlp update. pip runs without prompts, times out after 90 seconds,
+  and cleans up its process tree on exit. Cancelling the import also stops the update.
+- 修正匯入前更新 yt-dlp 時可能卡住的問題。pip 不會等待輸入，逾時上限為 90 秒，結束時會清理整棵程序樹。
+  取消匯入也會停止更新。
 
 ## 1.0.7 — 2026-11-23
 

@@ -1,8 +1,9 @@
 """Offline updater regression tests using real subprocesses and fake pip."""
 
-import json
+import io
 import os
 from pathlib import Path
+import signal
 import socket
 import subprocess
 import sys
@@ -11,8 +12,9 @@ import textwrap
 import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import ExitStack
-from datetime import date, timedelta
+from contextlib import ExitStack, redirect_stdout
+from datetime import datetime, timedelta, timezone
+from threading import Event
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,11 +22,8 @@ sys.path.insert(0, str(ROOT))
 import main
 
 
-def wait_for(predicate, seconds=8):
-    deadline = time.monotonic() + seconds
-    while not predicate() and time.monotonic() < deadline:
-        time.sleep(0.02)
-    return predicate()
+class Cancelled(Exception):
+    pass
 
 
 class PipProcessTest(unittest.TestCase):
@@ -53,6 +52,15 @@ class PipProcessTest(unittest.TestCase):
                     runner.kill()
 
     def test_timeout_kills_pip_its_child_and_grandchild(self):
+        self._check_tree_cleanup("timeout")
+
+    def test_cancel_kills_pip_its_child_and_grandchild(self):
+        self._check_tree_cleanup("cancel")
+
+    def test_normal_exit_kills_leftover_descendants(self):
+        self._check_tree_cleanup("success")
+
+    def _check_tree_cleanup(self, exit_path):
         # Each process holds a connection open. EOF verifies it exited, even if its PID
         # remains visible briefly on POSIX while it is waiting to be reaped.
         tree = textwrap.dedent("""
@@ -66,14 +74,20 @@ class PipProcessTest(unittest.TestCase):
                 conn.settimeout(15)
                 conn.recv(1)
         """)
+        cancelled = Event()
+
+        def cancel():
+            if cancelled.is_set():
+                raise Cancelled("import cancelled")
+
         with tempfile.TemporaryDirectory() as folder, socket.create_server(("127.0.0.1", 0)) as server, \
              ThreadPoolExecutor(max_workers=1) as executor, ExitStack() as connections:
             script = Path(folder) / "tree.py"
             script.write_text(tree, encoding="utf-8")
             server.settimeout(2)
             cmd = [sys.executable, str(script), str(server.getsockname()[1]), "2"]
-            with patch.object(main, "PIP_TIMEOUT_SEC", 4):
-                pip = executor.submit(main._run_pip, cmd)
+            with patch.object(main, "PIP_TIMEOUT_SEC", 4 if exit_path == "timeout" else 12):
+                pip = executor.submit(main._run_pip, cmd, cancel)
                 sockets = {}
                 for _ in range(3):
                     conn, _ = server.accept()
@@ -81,13 +95,43 @@ class PipProcessTest(unittest.TestCase):
                     conn.settimeout(2)
                     sockets[conn.recv(1)] = conn
                 self.assertEqual(sockets.keys(), {b"\x00", b"\x01", b"\x02"})
-                with self.assertRaises(subprocess.TimeoutExpired):
-                    pip.result(timeout=6)
+                if exit_path == "timeout":
+                    with self.assertRaises(subprocess.TimeoutExpired):
+                        pip.result(timeout=6)
+                elif exit_path == "cancel":
+                    cancelled.set()
+                    with self.assertRaises(Cancelled):
+                        pip.result(timeout=2)
+                else:
+                    sockets[b"\x02"].sendall(b"1")
+                    self.assertEqual(pip.result(timeout=2).returncode, 0)
             for conn in sockets.values():
                 try:
                     self.assertEqual(conn.recv(1), b"", "a pip descendant survived the timeout")
                 except ConnectionResetError:
                     pass  # Windows can close a killed process's socket with a reset.
+
+    def test_posix_group_is_killed_in_finally(self):
+        cmd = ["pip"]
+        timeout = subprocess.TimeoutExpired(cmd, 90)
+        for outcome in (0, timeout, Cancelled(), KeyboardInterrupt()):
+            with self.subTest(outcome=outcome), patch.object(main.sys, "platform", "darwin"), \
+                 patch.object(main.subprocess, "Popen") as spawn, \
+                 patch.object(main.os, "killpg", create=True) as killpg, \
+                 patch.object(signal, "SIGKILL", 9, create=True):
+                proc = spawn.return_value.__enter__.return_value
+                proc.pid = 123
+                if isinstance(outcome, BaseException):
+                    proc.wait.side_effect = outcome
+                    with self.assertRaises(type(outcome)):
+                        main._run_pip(cmd)
+                else:
+                    killpg.side_effect = PermissionError
+                    proc.wait.return_value = outcome
+                    self.assertEqual(main._run_pip(cmd).returncode, outcome)
+                killpg.assert_called_once_with(proc.pid, signal.SIGKILL)
+                self.assertIs(spawn.call_args.kwargs["stdin"], subprocess.DEVNULL)
+                self.assertTrue(spawn.call_args.kwargs["start_new_session"])
 
 
 class UpdateTest(unittest.TestCase):
@@ -99,22 +143,16 @@ class UpdateTest(unittest.TestCase):
         self.ext = self.root / "ext"
         package = self.ext / "_deps" / "yt_dlp"
         package.mkdir(parents=True)
-        self.version = date.today().isoformat().replace("-", ".")
-        self.latest = (date.today() + timedelta(days=1)).isoformat().replace("-", ".")
+        today = datetime.now(timezone.utc).date()
+        self.version = today.isoformat().replace("-", ".")
+        self.latest = (today + timedelta(days=1)).isoformat().replace("-", ".")
         (package / "version.py").write_text(f"__version__ = {self.version!r}", encoding="utf-8")
         self.addCleanup(main.setup, dict(main._context))
         main.setup({"dataDir": str(self.data)})
         self.addCleanup(patch.stopall)
         patch.object(main, "HERE", str(self.ext)).start()
 
-    def test_recent_and_old_versions_use_different_check_intervals(self):
-        state = {"checkedAt": time.time() - 3600}
-        self.assertFalse(main._update_due(state))
-        old = (date.today() - timedelta(days=main.RECENT_YT_DLP_DAYS + 1)).isoformat().replace("-", ".")
-        with patch.object(main, "_active_version", return_value=old):
-            self.assertTrue(main._update_due(state))
-
-    def test_pip_failure_and_timeout_persist_and_back_off(self):
+    def test_pip_failure_and_timeout_keep_the_107_recheck_intervals(self):
         for result in (subprocess.CompletedProcess([], 1, "fake pip failed"), subprocess.TimeoutExpired("pip", 90)):
             with self.subTest(result=result):
                 clock = time.time()
@@ -122,7 +160,7 @@ class UpdateTest(unittest.TestCase):
                 with patch.object(main.time, "time", return_value=clock) as now, \
                      patch.object(main, "_latest_release", return_value=(self.latest, "yt-dlp-ejs")) as latest, \
                      patch.object(main, "_run_pip") as pip:
-                    def fake_pip(cmd):
+                    def fake_pip(cmd, cancel):
                         Path(cmd[cmd.index("--target") + 1]).mkdir()
                         if isinstance(result, Exception):
                             raise result
@@ -132,7 +170,7 @@ class UpdateTest(unittest.TestCase):
                     self.assertFalse(main.update_yt_dlp())
                     state = main._read_state()
                     self.assertEqual(state["checkedAt"], clock)
-                    self.assertIn("updateError", state)
+                    self.assertEqual(state["latest"], self.latest)
                     self.assertEqual(main._active_version(), self.version)
                     now.return_value = clock + main.RECHECK_AFTER_ERROR_SEC - 1
                     self.assertFalse(main.update_yt_dlp())
@@ -140,8 +178,13 @@ class UpdateTest(unittest.TestCase):
                     self.assertEqual(latest.call_count, 1)
                     now.return_value += 1
                     self.assertFalse(main.update_yt_dlp())
+                    self.assertEqual(latest.call_count, 1)
+                    self.assertFalse(main.update_yt_dlp(after_error=True))
                     self.assertEqual(latest.call_count, 2)
-                    self.assertFalse((Path(main._store()) / (self.latest + ".tmp")).exists())
+                    now.return_value += main.UPDATE_EVERY_SEC
+                    self.assertFalse(main.update_yt_dlp())
+                    self.assertEqual(latest.call_count, 3)
+                    self.assertFalse(list(Path(main._store()).glob("*.tmp")))
 
     def test_import_retries_after_a_repairable_failure(self):
         with patch.object(main, "update_yt_dlp", return_value=True) as update:
@@ -152,64 +195,98 @@ class UpdateTest(unittest.TestCase):
                 if len(calls) == 1:
                     update.assert_not_called()
                     raise RuntimeError("ERROR: Requested format is not available")
-                update.assert_called_once_with(None, after_error=True)
+                update.assert_called_once_with(None, after_error=True, cancel=None)
                 return "resolved"
 
             self.assertEqual(main._run(attempt, update=True), "resolved")
 
-    def test_recent_version_resolves_while_the_background_pip_waits(self):
-        release = self.root / "release.json"
-        release.write_text(json.dumps({"info": {"version": self.latest}}), encoding="utf-8")
-        source = (ROOT / "main.py").read_text(encoding="utf-8")
-        (self.ext / "main.py").write_text(source.replace(main.PYPI_URL, release.as_uri(), 1), encoding="utf-8")
-        ready, go = self.root / "started", self.root / "proceed"
-        song = self.root / "song"
-        song.mkdir()
-        fake_modules = self.root / "fake_modules"
-        fake_modules.mkdir()
-        (fake_modules / "pip.py").write_text(textwrap.dedent("""
-            import sys, time
-            from pathlib import Path
+    def test_resolve_updates_before_downloading_and_retries_busy_replaces(self):
+        output = self.root / "raw_audio.webm"
+        output.touch()
+        store = Path(main._store())
+        other_stage = store / f"{self.latest}.{os.getpid() + 1}.tmp"
+        other_stage.mkdir(parents=True)
+        replace = os.replace
+        replaced = {}
 
-            Path({ready!r}).touch()
-            for _ in range(600):
-                if Path({go!r}).exists():
-                    break
-                time.sleep(0.02)
-            else:
-                sys.exit("test never released pip")
-            target = Path(sys.argv[sys.argv.index("--target") + 1]) / "yt_dlp"
+        def busy_replace(source, dest):
+            self.assertTrue(source.endswith(f".{os.getpid()}.tmp"))
+            replaced[dest] = replaced.get(dest, 0) + 1
+            if replaced[dest] == 1:
+                raise PermissionError("destination is still open")
+            replace(source, dest)
+
+        def fake_pip(cmd, cancel):
+            target = Path(cmd[cmd.index("--target") + 1]) / "yt_dlp"
             target.mkdir(parents=True)
-            (target / "version.py").write_text({version_file!r}, encoding="utf-8")
-        """).format(ready=str(ready), go=str(go), version_file=f"__version__ = {self.latest!r}"), encoding="utf-8")
-        runner = textwrap.dedent("""
-            import sys
-            from pathlib import Path
-            from unittest.mock import patch
-            import main
+            (target / "version.py").write_text(f"__version__ = {self.latest!r}", encoding="utf-8")
+            return subprocess.CompletedProcess(cmd, 0, "")
 
-            main.setup({"dataDir": sys.argv[1]})
-            output = Path(sys.argv[2]) / "raw_audio.webm"
-            output.touch()
-            def download(*args):
-                assert main._active_version() == sys.argv[3]
-                assert not Path(sys.argv[4]).exists()
-                return {"requested_downloads": [{"filepath": str(output)}]}
-            with patch.object(main, "_download", download), patch.object(main, "ensure_js_runtime"):
-                result = main.resolve("YJfHuATJYsQ", sys.argv[2], lambda *a: None, lambda: None)
-            assert result["audio_path"] == str(output)
-            print("resolved")
-        """)
-        env = dict(os.environ, PYTHONPATH=os.pathsep.join((str(self.ext), str(fake_modules))))
+        def download(*args):
+            self.assertEqual(main._active_version(), self.latest)
+            return {"requested_downloads": [{"filepath": str(output)}]}
+
+        with io.TextIOWrapper(io.BytesIO(), encoding="cp1252") as log, redirect_stdout(log), \
+             patch.object(main, "_latest_release", return_value=(self.latest, "yt-dlp-ejs")), \
+             patch.object(main, "_run_pip", side_effect=fake_pip), patch.object(main, "_download", side_effect=download), \
+             patch.object(main, "ensure_js_runtime"), patch.object(main.os, "replace", side_effect=busy_replace):
+            result = main.resolve("YJfHuATJYsQ", str(self.root), lambda *a: None, lambda: None)
+            log.seek(0)
+            self.assertIn(f"{self.version} -> {self.latest}", log.read())
+        self.assertEqual(result["audio_path"], str(output))
+        self.assertEqual(replaced, {str(store / "state.json"): 3, str(store / self.latest): 2})
+        self.assertEqual(list(store.glob("*.tmp")), [other_stage])
+
+    def test_resolve_does_not_swallow_cancel_or_start_the_download(self):
+        cancelled = Event()
+
+        def cancel():
+            if cancelled.is_set():
+                raise Cancelled("import cancelled")
+
+        def fake_pip(cmd, poll_cancel):
+            Path(cmd[cmd.index("--target") + 1]).mkdir()
+            cancelled.set()
+            poll_cancel()
+
+        with patch.object(main, "_latest_release", return_value=(self.latest, "yt-dlp-ejs")), \
+             patch.object(main, "_run_pip", side_effect=fake_pip), patch.object(main, "_download") as download:
+            with self.assertRaises(Cancelled):
+                main.resolve("YJfHuATJYsQ", str(self.root), lambda *a: None, cancel)
+            download.assert_not_called()
+        store = Path(main._store())
+        self.assertFalse((store / ".lock").exists())
+        self.assertFalse(list(store.glob("*.tmp")))
+
+    def test_cancel_during_pypi_lookup_releases_the_lock_without_starting_pip(self):
+        started, release = Event(), Event()
+
+        def latest():
+            started.set()
+            release.wait(5)
+            return self.latest, "yt-dlp-ejs"
+
+        def cancel():
+            if started.is_set():
+                raise Cancelled("import cancelled")
+
         try:
-            result = subprocess.run([sys.executable, "-c", runner, str(self.data), str(song),
-                                     self.version, str(ready)], cwd=song, env=env,
-                                    stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=8, check=True)
-            self.assertEqual(result.stdout.strip(), "resolved")
-            self.assertTrue(wait_for(ready.is_file), "background pip did not start after the runner exited")
-            self.assertEqual(main._active_version(), self.version)
-            song.rename(self.root / "completed-song")
+            with patch.object(main, "_latest_release", side_effect=latest), patch.object(main, "_run_pip") as pip:
+                with self.assertRaises(Cancelled):
+                    main.update_yt_dlp(cancel=cancel)
+                pip.assert_not_called()
         finally:
-            go.touch()
-        self.assertTrue(wait_for(lambda: main._active_version() == self.latest))
-        self.assertTrue(wait_for(lambda: not (Path(main._store()) / ".lock").exists()))
+            release.set()
+        self.assertFalse((Path(main._store()) / ".lock").exists())
+
+    def test_error_triggered_update_also_honors_cancel(self):
+        def attempt():
+            raise RuntimeError("ERROR: Requested format is not available")
+
+        def cancel():
+            raise Cancelled("import cancelled")
+
+        with patch.object(main, "_latest_release") as latest:
+            with self.assertRaises(Cancelled):
+                main._run(attempt, update=True, cancel=cancel)
+            latest.assert_not_called()
