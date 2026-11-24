@@ -27,6 +27,19 @@ class Cancelled(Exception):
 
 
 class PipProcessTest(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == "win32", "Windows Job Object launcher")
+    def test_windows_launcher_uses_only_an_existing_base_executable(self):
+        base = getattr(sys, "_base_executable", None) or sys.executable
+        base = os.path.join(os.path.dirname(base), ".", os.path.basename(base))
+        with tempfile.TemporaryDirectory() as folder:
+            for candidate, expected in ((base, base), (None, sys.executable), ("", sys.executable),
+                                        (os.path.join(folder, "missing.exe"), sys.executable),
+                                        (folder, sys.executable)):
+                with self.subTest(candidate=candidate), patch.object(sys, "_base_executable", candidate, create=True), \
+                     patch.object(subprocess, "Popen", wraps=subprocess.Popen) as spawn:
+                    self.assertEqual(main._run_pip([sys.executable, "-c", "pass"]).returncode, 0)
+                    self.assertEqual(spawn.call_args.args[0][0], expected)
+
     def test_pip_gets_eof_even_with_the_host_stdin_pipe_open(self):
         fake_pip = textwrap.dedent("""
             import os, sys
@@ -206,6 +219,10 @@ class UpdateTest(unittest.TestCase):
         store = Path(main._store())
         other_stage = store / f"{self.latest}.{os.getpid() + 1}.tmp"
         other_stage.mkdir(parents=True)
+        stale_stage = store / f"{self.latest}.{os.getpid() + 2}.tmp"
+        stale_stage.mkdir()
+        stale_time = time.time() - main.LOCK_STALE_SEC - 60
+        os.utime(stale_stage, (stale_time, stale_time))
         replace = os.replace
         replaced = {}
 

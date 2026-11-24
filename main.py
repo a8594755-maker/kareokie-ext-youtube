@@ -255,7 +255,8 @@ def _run_windows_pip(cmd: List[str], env: Dict[str, str], output: Any,
             "creationflags=subprocess.CREATE_NO_WINDOW))\n"
         )
         # Use the real interpreter for the gate so a venv redirector cannot spawn it before assignment.
-        executable = getattr(sys, "_base_executable", sys.executable)
+        base = getattr(sys, "_base_executable", None)
+        executable = base if base and os.path.isfile(base) else sys.executable
         proc = subprocess.Popen([executable, "-I", "-S", "-c", launcher, *cmd], env=env,
                                 stdin=subprocess.PIPE, stdout=output, stderr=subprocess.STDOUT,
                                 creationflags=subprocess.CREATE_NO_WINDOW)
@@ -351,10 +352,18 @@ def update_yt_dlp(progress: Optional[Callable[..., None]] = None, after_error: b
         previous = state.get("version")
         _write_state(dict(_read_state(), version=latest, previousVersion=previous, updatedAt=time.time()))
         # keep the copy before this one: a call that started earlier may still be using it
+        stale_before = time.time() - LOCK_STALE_SEC
         for name in os.listdir(store):
             path = os.path.join(store, name)
-            if os.path.isdir(path) and name not in (latest, previous) and not name.endswith(".tmp"):
-                shutil.rmtree(path, ignore_errors=True)
+            if name in (latest, previous) or not os.path.isdir(path):
+                continue
+            if name.endswith(".tmp"):
+                try:
+                    if os.path.getmtime(path) >= stale_before:
+                        continue
+                except OSError:
+                    continue
+            shutil.rmtree(path, ignore_errors=True)
         print(f"[yt-dlp update] {current} -> {latest}")
         return True
     except Exception as exc:  # offline, PyPI down, pip missing…: keep the current yt-dlp
